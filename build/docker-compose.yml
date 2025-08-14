@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  ac-backend-nest-dev:
+    container_name: ac-backend-nest-dev
+    image: registry.gitlab.com/ac-project/ac-backend-nest:dev
+    build:
+      context: ../
+      dockerfile: ./build/Dockerfile
+    ports:
+      - ${PORT_BE}:${PORT_DEFAULT_3000}
+    environment:
+      # MODE
+      MODE: ${MODE}
+      STORAGE_ENABLE: ${STORAGE_ENABLE}
+      # URL's
+      BASE_URL: ${BASE_URL}
+      DATABASE_URL: ${DATABASE_URL}
+      FRONTEND_URL: ${FRONTEND_URL}
+      FRONTEND_TEAM_URL: ${FRONTEND_TEAM_URL}
+      XENDIT_URL: ${XENDIT_URL}
+      BASE_URL_STORAGE_BUCKET: ${BASE_URL_STORAGE_BUCKET}
+      # SECRETS
+      JWT_SECRET: ${JWT_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL}
+      XENDIT_API_KEY: ${XENDIT_API_KEY}
+      XENDIT_TOKEN_VERIFICATION_WEBHOOK: ${XENDIT_TOKEN_VERIFICATION_WEBHOOK}
+      API_KEY_VALUE_STORAGE_BUCKET: ${API_KEY_VALUE_STORAGE_BUCKET}
+      TRIBE_STORAGE_BUCKET: ${TRIBE_STORAGE_BUCKET}
+      SUPER_ADMIN_PASSWORD_SEED: ${SUPER_ADMIN_PASSWORD_SEED}
+      # EMAIL
+      EMAIL_TRANSPORT_HOST: ${EMAIL_TRANSPORT_HOST}
+      EMAIL_TRANSPORT_USER: ${EMAIL_TRANSPORT_USER}
+      EMAIL_TRANSPORT_PASSWORD: ${EMAIL_TRANSPORT_PASSWORD}
+    volumes:
+      - ../:/usr/src/app
+      - /usr/src/app/node_modules
+    depends_on:
+      - ac-database-postgres-dev
+    restart: unless-stopped
+
+  ac-database-postgres-dev:
+    container_name: ac-database-postgres-dev
+    image: postgres:16-alpine3.20
+    ports:
+      - ${PORT_DB}:${PORT_DEFAULT_5432}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER_DEV}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_DEV}
+      POSTGRES_DB: ${POSTGRES_DB_DEV}
+    volumes:
+      - ac-volume-postres-dev:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  ac-volume-postres-dev:
+    external: true
+
+networks:
+  default:
+    name: ac-network-dev
+    external: true

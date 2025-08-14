@@ -1,0 +1,233 @@
+import { Prisma } from '@prisma/client';
+
+export const selectOrderProductWithRelations: Prisma.OrderProductSelect = {
+  id: true,
+  uuid: true,
+  name: true,
+  category: true,
+  description: true,
+  price: true,
+  quantity: true,
+  discount: true,
+  createdAt: true,
+  updatedAt: true,
+  deletedAt: true,
+  orderProductId: true,
+  orderId: true,
+  orderProductImage: true,
+};
+
+export const selectGeneralOrder: Prisma.OrderSelect = {
+  id: true,
+  uuid: true,
+  trackId: true,
+  name: true,
+  email: true,
+  phoneNumber: true,
+  paymentMethod: true,
+  deliveryService: true,
+  totalWeight: true,
+  cashback: true,
+  subTotalPay: true,
+  exchangePoint: true,
+  voucherDiscount: true,
+  deliveryFee: true,
+  totalPayment: true,
+  customerId: true,
+  voucherId: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+  expiredAt: true,
+  orderAddress: true,
+  orderProduct: {
+    select: {
+      id: true,
+      uuid: true,
+      name: true,
+      category: true,
+      description: true,
+      price: true,
+      quantity: true,
+      discount: true,
+      createdAt: true,
+      updatedAt: true,
+      deletedAt: true,
+      orderProductId: true,
+      orderId: true,
+      orderProductImage: {
+        select: {
+          url: true,
+        },
+      },
+    },
+  },
+  orderVoucher: true,
+  orderCallbackPayment: true,
+};
+
+export const selectGeneralListOrders: Prisma.OrderSelect = {
+  id: true,
+  voucherId: true,
+  exchangePoint: true,
+  customerId: true,
+  paymentMethod: true,
+  uuid: true,
+  createdAt: true,
+  trackId: true,
+  name: true,
+  orderAddress: {
+    select: {
+      address: true,
+    },
+  },
+  orderCallbackPayment: {
+    select: {
+      externalId: true,
+      referenceId: true,
+      qrReferenceId: true,
+      paylaterReferenceId: true,
+      retailOutletReferenceId: true,
+    },
+  },
+  totalPayment: true,
+  netAmount: true,
+  isNetAmountCalculated: true,
+  status: true,
+  expiredAt: true,
+};
+
+export const selectGeneralTrackOrder: Prisma.OrderSelect = {
+  id: true,
+  name: true,
+  voucherId: true,
+  exchangePoint: true,
+  customerId: true,
+  paymentMethod: true,
+  uuid: true,
+  trackId: true,
+  createdAt: true,
+  status: true,
+  orderProduct: {
+    select: {
+      quantity: true,
+      name: true,
+      price: true,
+      orderProductImage: {
+        select: {
+          uuid: true,
+          url: true,
+        },
+      },
+    },
+  },
+  totalPayment: true,
+  expiredAt: true,
+};
+
+export const selectGeneralRecentTransaction: Prisma.OrderSelect = {
+  name: true,
+  createdAt: true,
+  totalPayment: true,
+};
+
+export const selectOrderCreate: Prisma.OrderSelect = {
+  id: true,
+  uuid: true,
+  trackId: true,
+  name: true,
+  email: true,
+  phoneNumber: true,
+  paymentMethod: true,
+  deliveryService: true,
+  cashback: true,
+  subTotalPay: true,
+  exchangePoint: true,
+  voucherDiscount: true,
+  deliveryFee: true,
+  totalPayment: true,
+  customerId: true,
+  voucherId: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+  orderAddress: true,
+};
+
+export const selectTrackIdAndStatus: Prisma.OrderSelect = {
+  id: true,
+  name: true,
+  status: true,
+  totalPayment: true,
+  paymentMethod: true,
+  orderProduct: {
+    select: {
+      name: true,
+      price: true,
+      quantity: true,
+      orderProductImage: {
+        select: {
+          url: true,
+        },
+      },
+    },
+  },
+  orderCallbackPayment: {
+    select: {
+      va: true,
+      desktopCheckoutUrl: true,
+      mobileCheckoutUrl: true,
+      deepLinkCheckoutUrl: true,
+      qrCheckoutString: true,
+      qrString: true,
+      retailOutletCode: true,
+      paylaterDesktopWebCheckoutUrl: true,
+      paylaterMobileWebCheckoutUrl: true,
+      paylaterMobileDeeplinkCheckoutUrl: true,
+    },
+  },
+  voucherId: true,
+  expiredAt: true,
+  exchangePoint: true,
+  customerId: true,
+};
+
+export const selectOrderByUuid: Prisma.OrderSelect = {
+  id: true,
+  voucherId: true,
+  exchangePoint: true,
+  customerId: true,
+  paymentMethod: true,
+  uuid: true,
+  createdAt: true,
+  trackId: true,
+  name: true,
+  orderAddress: {
+    select: {
+      address: true,
+    },
+  },
+  orderProduct: {
+    select: {
+      name: true,
+      quantity: true,
+      price: true,
+      orderProductImage: {
+        select: {
+          uuid: true,
+          url: true,
+        },
+      },
+    },
+  },
+  subTotalPay: true,
+  voucherDiscount: true,
+  deliveryFee: true,
+  totalPayment: true,
+  xenditFee: true,
+  xenditFeeVat: true,
+  isNetAmountCalculated: true,
+  netAmount: true,
+  status: true,
+  expiredAt: true,
+};

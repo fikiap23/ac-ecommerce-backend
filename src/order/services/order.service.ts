@@ -1,0 +1,854 @@
+import { Injectable } from '@nestjs/common';
+import { CreateOrderDto, OrderNetDto } from '../dto/order.dto';
+import { ProductRepository } from 'src/product/repositories/product.repository';
+import { VoucherRepository } from 'src/voucher/repositories/voucher.repository';
+import { OrderRepository } from '../repositories/order.repository';
+import { CustomerRepository } from 'src/customer/repositories/customer.repository';
+import {
+  IFilterOrder,
+  IOrderPayment,
+  ISelectGeneralListOrder,
+  ISelectGeneralOrder,
+} from '../interfaces/order.interface';
+import { GatewayService } from 'src/gateway/services/gateway.service';
+import { Customer, TypeStatusOrder } from '@prisma/client';
+import { GatewayXenditRepository } from 'src/gateway/repositories/gateway-xendit.repository';
+import { MailService } from 'src/mail/services/mail.service';
+import { CustomError } from 'helpers/http.helper';
+import { OrderValidateRepository } from '../repositories/order-validate.repository';
+import { omit } from 'lodash';
+import {
+  formatToISOE164,
+  genRandomNumber,
+  splitName,
+} from 'helpers/data.helper';
+import { OrderCallbackPaymentRepository } from '../repositories/order-callback-payment.repository';
+import {
+  selectGeneralListOrders,
+  selectGeneralOrder,
+  selectGeneralTrackOrder,
+  selectOrderByUuid,
+  selectOrderCreate,
+  selectTrackIdAndStatus,
+} from 'src/prisma/queries/order/props/select-order.prop';
+import { selectProductForCreateOrder } from 'src/prisma/queries/product/props/select-product.prop';
+import { selectVoucherForCalculate } from 'src/prisma/queries/voucher/props/select-voucher.prop';
+import { ISelectVoucherForCalculate } from 'src/voucher/interfaces/voucher.interface';
+import {
+  IEwalletResponse,
+  IPaylaterChargeResponse,
+  IQrCodeResponse,
+  IRetailOutletResponse,
+  IVaResponse,
+} from 'src/gateway/interfaces/gateway-xendit.interface';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { CustomerVoucherRepository } from 'src/customer/repositories/customer-voucher.repository';
+
+@Injectable()
+export class OrderService {
+  constructor(
+    private readonly gatewayXenditRepository: GatewayXenditRepository,
+    private readonly gatewayService: GatewayService,
+    private readonly customerRepository: CustomerRepository,
+    private readonly productRepository: ProductRepository,
+    private readonly voucherRepository: VoucherRepository,
+    private readonly orderRepository: OrderRepository,
+    private readonly orderValidateRepository: OrderValidateRepository,
+    private readonly mailService: MailService,
+    private readonly orderCallbackPaymentRepository: OrderCallbackPaymentRepository,
+    private readonly prismaService: PrismaService,
+    private readonly customerVoucher: CustomerVoucherRepository,
+  ) {}
+
+  async validateMembership(authorization: string) {
+    return await this.orderValidateRepository.validateIsMembership(
+      authorization,
+    );
+  }
+
+  async createOrder(sub: string, dto: CreateOrderDto) {
+    const products = await this.productRepository.getMany({
+      where: {
+        uuid: { in: dto.carts.map((c) => c.productUuid) },
+        isActive: true,
+      },
+      select: selectProductForCreateOrder,
+    });
+    await this.orderValidateRepository.validateProducts(dto.carts, products);
+
+    const isVa = this.gatewayXenditRepository.isVa(dto.paymentMethod);
+    const isEwallet = this.gatewayXenditRepository.isEwallet(dto.paymentMethod);
+    const isQrCode = this.gatewayXenditRepository.isQRCode(dto.paymentMethod);
+    const isPaylater = this.gatewayXenditRepository.isPaylater(
+      dto.paymentMethod,
+    );
+    const isRetailOutlet = this.gatewayXenditRepository.isRetailOutlet(
+      dto.paymentMethod,
+    );
+    this.orderValidateRepository.validatePaymentMethod(
+      isVa,
+      isEwallet,
+      isQrCode,
+      isPaylater,
+      isRetailOutlet,
+    );
+
+    let subTotalPay = 0;
+    let voucherDiscount = 0;
+    let deliveryFee = 0;
+    let totalPayment = 0;
+
+    const isMembership = sub;
+    const useVoucher = isMembership && dto.voucherUuid;
+
+    let customer: Customer | null = null;
+
+    subTotalPay = await this.orderRepository.calculateTotalAmount(
+      dto.carts,
+      products,
+    );
+    this.orderValidateRepository.validateSubTotalPay(
+      subTotalPay,
+      dto.subTotalPay,
+    );
+    totalPayment += subTotalPay;
+
+    let voucher: ISelectVoucherForCalculate;
+    if (useVoucher) {
+      voucher = await this.voucherRepository.getThrowByUuid({
+        uuid: dto.voucherUuid,
+        select: selectVoucherForCalculate,
+      });
+      voucherDiscount = await this.orderRepository.calculateVoucher({
+        voucher,
+        customerId: customer.id,
+        carts: dto.carts,
+        products,
+        subTotalPay,
+      });
+      this.orderValidateRepository.validateVoucherDiscount(
+        voucherDiscount,
+        dto.voucherDiscount,
+      );
+      totalPayment -= voucherDiscount;
+    }
+
+    this.orderValidateRepository.validateAllowedDeliveryService(dto);
+
+    totalPayment += deliveryFee;
+
+    console.log({
+      subTotalPay,
+      voucherDiscount,
+      deliveryFee,
+      totalPayment,
+    });
+    this.orderValidateRepository.validateTotalPayment(
+      totalPayment,
+      dto.totalPayment,
+    );
+
+    let va: IVaResponse | null = null;
+    let ewallet: IEwalletResponse | null = null;
+    let qrCode: IQrCodeResponse | null = null;
+    let paylater: IPaylaterChargeResponse | null = null;
+    let retailOutlet: IRetailOutletResponse | null = null;
+    const orderRefId = `order-${Date.now().toString()}-${genRandomNumber(20)}`;
+    const trackId = this.orderRepository.genTrackId(20);
+    if (isVa) {
+      va = await this.gatewayService.httpPostCreateVa({
+        expected_amount: totalPayment,
+        name: dto.name,
+        bank_code: dto.paymentMethod,
+        external_id: orderRefId,
+        expiration_date: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+      });
+    }
+    if (isEwallet) {
+      const isOVO = dto.paymentMethod === 'ID_OVO';
+      const ewalletPayload = {
+        reference_id: orderRefId,
+        currency: 'IDR',
+        amount: totalPayment,
+        checkout_method: 'ONE_TIME_PAYMENT',
+        channel_code: dto.paymentMethod,
+        callback_url: 'https://baa902780ef7.ngrok-free.app/order-payment',
+        channel_properties: isOVO
+          ? { mobile_number: dto.phoneNumber }
+          : {
+              success_redirect_url:
+                process.env.FRONTEND_URL +
+                `/payment/order-success?id=${trackId}`,
+            },
+      };
+      ewallet = await this.gatewayService.httpPostChargeEwallet(ewalletPayload);
+    }
+    if (isQrCode) {
+      qrCode = await this.gatewayService.httpPostQrCode({
+        reference_id: orderRefId,
+        amount: totalPayment,
+        expires_at: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+      });
+    }
+    if (isPaylater) {
+      const splittedName = splitName(dto.name);
+      const formattedToE164 = formatToISOE164(dto.phoneNumber);
+      const customerXendit = await this.gatewayService.httpPostCustomerXendit({
+        reference_id: orderRefId,
+        individual_detail: {
+          given_names: splittedName.givenNames,
+          surname: splittedName.surname,
+        },
+        email: dto.email,
+        mobile_number: formattedToE164,
+        addresses: [
+          {
+            street_line1: dto.shippingAddress.address,
+            city: dto.shippingAddress.city,
+            postal_code: dto.shippingAddress.postalCode,
+            country: 'ID',
+          },
+        ],
+      });
+      const paylaterPlan = await this.gatewayService.httpPostPaylaterPlan({
+        customer_id: customerXendit.id,
+        channel_code: dto.paymentMethod,
+        amount: totalPayment,
+        order_items: products.map((p) => {
+          const cartItem = dto.carts.find((c) => c.productUuid === p.uuid);
+
+          return {
+            type: 'PHYSICAL_PRODUCT',
+            reference_id: p.uuid,
+            name: p.name,
+            net_unit_amount: p?.price,
+            quantity: cartItem.quantity,
+            url: process.env.FRONTEND_URL + '/catalog/' + p.uuid,
+            category: 'product',
+          };
+        }),
+      });
+      paylater = await this.gatewayService.httpPostPaylaterCharge({
+        plan_id: paylaterPlan.id,
+        reference_id: orderRefId,
+        success_redirect_url:
+          process.env.FRONTEND_URL + `/payment/order-success?id=${trackId}`,
+        failure_redirect_url: process.env.FRONTEND_URL,
+      });
+    }
+    if (isRetailOutlet) {
+      retailOutlet = await this.gatewayService.httpPostRetailOutlet({
+        reference_id: orderRefId,
+        request_amount: totalPayment,
+        channel_code: dto.paymentMethod,
+        channel_properties: {
+          payer_name: dto.name,
+          expires_at: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+        },
+      });
+    }
+
+    const data = await this.prismaService.execTx(async (tx) => {
+      const createdOrder = await tx.order.create({
+        data: {
+          trackId,
+          name: dto.name,
+          email: dto.email,
+          phoneNumber: dto.phoneNumber,
+          paymentMethod: dto.paymentMethod,
+          deliveryService: dto.deliveryService,
+          expiredAt: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+          subTotalPay,
+          deliveryFee,
+          totalPayment,
+          orderAddress: {
+            create: dto.shippingAddress,
+          },
+          orderProduct: {
+            create: products.map((p) => {
+              const cartItem = dto.carts.find((c) => c.productUuid === p.uuid);
+
+              return {
+                ...omit(p, [
+                  'id',
+                  'uuid',
+                  'categoryProduct',
+                  'productImage',
+                  'productVoucher',
+                  'isActive',
+                ]),
+                category: p.categoryProduct.name,
+                orderProductId: p.id,
+                quantity: cartItem.quantity,
+                discount: 0,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                orderProductImage: {
+                  create: p.productImage.map(
+                    ({ id, uuid, productId, ...pi }) => ({
+                      ...pi,
+                      createdAt: new Date(),
+                      updatedAt: new Date(),
+                    }),
+                  ),
+                },
+              };
+            }),
+          },
+
+          orderCallbackPayment: {
+            create: {
+              xenditId:
+                va?.id ||
+                ewallet?.id ||
+                qrCode?.id ||
+                paylater?.id ||
+                retailOutlet?.payment_request_id,
+              va: va?.account_number,
+              externalId: va?.external_id,
+              referenceId: ewallet?.reference_id,
+              qrReferenceId: qrCode?.reference_id,
+              qrString: qrCode?.qr_string,
+              desktopCheckoutUrl: ewallet?.actions?.desktop_web_checkout_url,
+              mobileCheckoutUrl: ewallet?.actions?.mobile_web_checkout_url,
+              deepLinkCheckoutUrl:
+                ewallet?.actions?.mobile_deeplink_checkout_url,
+              qrCheckoutString: ewallet?.actions?.qr_checkout_string,
+              retailOutletCode: retailOutlet?.actions[0]?.value,
+              retailOutletReferenceId: retailOutlet?.reference_id,
+              paylaterReferenceId: paylater?.reference_id,
+              paylaterDesktopWebCheckoutUrl:
+                paylater?.actions?.desktop_web_checkout_url,
+              paylaterMobileWebCheckoutUrl:
+                paylater?.actions?.mobile_web_checkout_url,
+              paylaterMobileDeeplinkCheckoutUrl:
+                paylater?.actions?.mobile_deeplink_checkout_url,
+            },
+          },
+        },
+        select: selectOrderCreate,
+      });
+
+      if (useVoucher) {
+        await tx.voucher.update({
+          where: { uuid: dto.voucherUuid },
+          data: {
+            quota: {
+              decrement: 1,
+            },
+          },
+        });
+      }
+
+      return createdOrder;
+    });
+
+    await this.mailService.sendInvoice({
+      subject: '[NEO] Awaiting Payment - Your Order',
+      title: 'Complete Your Order',
+      description:
+        'Just created an order? 📝 Click Complete Your Order, enter your Order ID, and follow the steps to make your payment and confirm it! 💳🛒',
+      buttonText: 'Complete Your Order',
+      link: `${process.env.FRONTEND_URL}/payment/${trackId}`,
+      email: data.email,
+      order: {
+        id: trackId,
+        name: data.name,
+        phone: data.phoneNumber,
+        email: data.email,
+        address: data.orderAddress.address,
+        products: products.map((p) => ({
+          name: p.name,
+          price: p?.price?.toString(),
+          qty: dto.carts.find((c) => c.productUuid === p.uuid).quantity,
+          discount: '0',
+        })),
+        subtotal: data.subTotalPay.toString(),
+        totalDiscount:
+          sub && dto.voucherUuid ? dto.voucherDiscount.toString() : '0',
+        deliveryFee: data.deliveryFee.toString(),
+        total: data.totalPayment.toString(),
+        status: this.orderRepository.formatOrderStatus(
+          TypeStatusOrder.WAITING_PAYMENT,
+        ),
+        statusColor: '#fa7c46',
+      },
+    });
+
+    return {
+      orderId: trackId,
+    };
+  }
+
+  async getOrderByUuid(uuid: string) {
+    const order = await this.orderRepository.getThrowByUuid({
+      uuid,
+      select: selectOrderByUuid,
+    });
+
+    if (order.expiredAt && order.expiredAt < new Date()) {
+      await this.orderRepository.update({
+        where: { id: order.id },
+        data: {
+          status: TypeStatusOrder.CANCELLED,
+          expiredAt: null,
+        },
+      });
+
+      if (order.voucherId) {
+        await this.voucherRepository.updateById({
+          id: order.voucherId,
+          data: {
+            quota: {
+              increment: 1,
+            },
+          },
+        });
+      }
+
+      const isVa = this.gatewayXenditRepository.isVa(order.paymentMethod);
+      const orderCallbackPayment =
+        await this.orderCallbackPaymentRepository.getThrowByOrderId({
+          orderId: order.id,
+        });
+      if (isVa) {
+        await this.gatewayService.httpPatchVa(orderCallbackPayment.xenditId, {
+          expiration_date: new Date(),
+        });
+      }
+
+      order.status = TypeStatusOrder.CANCELLED;
+      order.expiredAt = null;
+    }
+
+    const { id, voucherId, customerId, ...response } = order;
+
+    return response;
+  }
+
+  async getPayment(trackId: string) {
+    const order = await this.orderRepository.getThrowByTrackId({
+      trackId,
+      select: selectTrackIdAndStatus,
+    });
+
+    if (order.expiredAt && order.expiredAt < new Date()) {
+      await this.orderRepository.update({
+        where: { id: order.id },
+        data: {
+          status: TypeStatusOrder.CANCELLED,
+          expiredAt: null,
+        },
+      });
+
+      if (order.voucherId) {
+        await this.voucherRepository.updateById({
+          id: order.voucherId,
+          data: {
+            quota: {
+              increment: 1,
+            },
+          },
+        });
+      }
+
+      const isVa = this.gatewayXenditRepository.isVa(order.paymentMethod);
+      const orderCallbackPayment =
+        await this.orderCallbackPaymentRepository.getThrowByOrderId({
+          orderId: order.id,
+        });
+      if (isVa) {
+        await this.gatewayService.httpPatchVa(orderCallbackPayment.xenditId, {
+          expiration_date: new Date(),
+        });
+      }
+
+      order.status = TypeStatusOrder.CANCELLED;
+      order.expiredAt = null;
+    }
+
+    const { id, voucherId, exchangePoint, customerId, ...response } = order;
+
+    return response;
+  }
+
+  async orderPayment(token: string, dto: IOrderPayment) {
+    const tokenVerification = process.env.XENDIT_TOKEN_VERIFICATION_WEBHOOK;
+
+    if (token !== tokenVerification) {
+      throw new CustomError({ message: 'Unauthorized', statusCode: 401 });
+    }
+
+    const fromVa = dto?.payment_id;
+    const fromEWallet = dto?.event === 'ewallet.capture';
+    const fromQrCode = dto?.event === 'qr.payment';
+    const fromPaylater = dto?.event === 'paylater.payment';
+    const fromRetailOutlet =
+      dto?.data?.channel_code === 'ALFAMART' ||
+      dto?.data?.channel_code === 'INDOMARET';
+
+    let order: ISelectGeneralOrder;
+
+    if (fromVa) {
+      const orderCallback =
+        await this.orderCallbackPaymentRepository.getThrowByExternalId({
+          externalId: dto.external_id,
+        });
+      order = await this.orderRepository.getThrowById({
+        id: orderCallback.orderId,
+        select: selectGeneralOrder,
+      });
+    }
+
+    if (fromEWallet) {
+      const orderCallback =
+        await this.orderCallbackPaymentRepository.getThrowByReferenceId({
+          referenceId: dto.data.reference_id,
+        });
+      order = await this.orderRepository.getThrowById({
+        id: orderCallback.orderId,
+        select: selectGeneralOrder,
+      });
+    }
+
+    if (fromQrCode) {
+      const orderCallback =
+        await this.orderCallbackPaymentRepository.getThrowByQrReferenceId({
+          qrReferenceId: dto.data.reference_id,
+        });
+      order = await this.orderRepository.getThrowById({
+        id: orderCallback.orderId,
+        select: selectGeneralOrder,
+      });
+    }
+
+    if (fromPaylater) {
+      const orderCallback =
+        await this.orderCallbackPaymentRepository.getThrowByPaylaterReferenceId(
+          {
+            paylaterReferenceId: dto.data.reference_id,
+          },
+        );
+      order = await this.orderRepository.getThrowById({
+        id: orderCallback.orderId,
+        select: selectGeneralOrder,
+      });
+    }
+
+    if (fromRetailOutlet) {
+      const orderCallback =
+        await this.orderCallbackPaymentRepository.getThrowByRetailOutletReferenceId(
+          {
+            retailOutletReferenceId: dto.data.reference_id,
+          },
+        );
+      order = await this.orderRepository.getThrowById({
+        id: orderCallback.orderId,
+        select: selectGeneralOrder,
+      });
+    }
+
+    if (order?.expiredAt < new Date()) {
+      await this.orderRepository.update({
+        where: { id: order.id },
+        data: {
+          status: TypeStatusOrder.CANCELLED,
+          expiredAt: null,
+        },
+      });
+
+      throw new CustomError({
+        message: 'Order Expired',
+        statusCode: 400,
+      });
+    }
+
+    await this.orderRepository.update({
+      where: { id: order.id },
+      data: {
+        status: TypeStatusOrder.ON_PROGRESS,
+        expiredAt: null,
+      },
+    });
+
+    if (order.customerId) {
+      const customer = await this.customerRepository.getThrowById({
+        id: order.customerId,
+      });
+
+      if (order.voucherId) {
+        await this.customerVoucher.upsert({
+          where: {
+            customerId_voucherId: {
+              customerId: customer.id,
+              voucherId: order.voucherId,
+            },
+          },
+          update: {
+            usageCount: { increment: 1 },
+          },
+          create: {
+            customer: { connect: { id: customer.id } },
+            voucher: { connect: { id: order.voucherId } },
+            usageCount: 1,
+          },
+        });
+      }
+    }
+
+    await this.mailService.sendInvoice({
+      subject: '[NEO] Receipt - Your Order',
+      title: 'Check Tracking',
+      description:
+        'Want real-time updates on your order? 📦 Click "Check Tracking", enter your Order ID, and stay informed every step of the way! 🚀',
+      buttonText: 'Check Tracking',
+      link: `${process.env.FRONTEND_URL}/track-order/${order.trackId}`,
+      email: order.email,
+      order: {
+        id: order.trackId,
+        name: order.name,
+        phone: order.phoneNumber,
+        email: order.email,
+        address: order.orderAddress.address,
+        products: order.orderProduct.map((p) => ({
+          name: p.name,
+          price: p?.price?.toString(),
+          qty: p.quantity,
+          discount: p.discount.toString(),
+        })),
+        subtotal: order.subTotalPay.toString(),
+        totalDiscount: order.voucherDiscount.toString(),
+        deliveryFee: order.deliveryFee.toString(),
+        total: order.totalPayment.toString(),
+        status: this.orderRepository.formatOrderStatus(
+          TypeStatusOrder.ON_PROGRESS,
+        ),
+        statusColor: '#4673fa',
+      },
+    });
+
+    return { status: 'success' };
+  }
+
+  async orderCancel(trackId: string) {
+    const order = await this.orderRepository.getThrowByTrackId({
+      trackId,
+    });
+    this.orderValidateRepository.validateCancelOrderExpired(order.expiredAt);
+    this.orderValidateRepository.validateCancelOrderStatus(order.status);
+    await this.orderRepository.update({
+      where: { id: order.id },
+      data: {
+        status: TypeStatusOrder.CANCELLED,
+        expiredAt: null,
+      },
+    });
+    if (order.voucherId) {
+      await this.voucherRepository.updateById({
+        id: order.voucherId,
+        data: {
+          quota: {
+            increment: 1,
+          },
+        },
+      });
+    }
+
+    const isVa = this.gatewayXenditRepository.isVa(order.paymentMethod);
+    const orderCallbackPayment =
+      await this.orderCallbackPaymentRepository.getThrowByOrderId({
+        orderId: order.id,
+      });
+    if (isVa) {
+      await this.gatewayService.httpPatchVa(orderCallbackPayment.xenditId, {
+        expiration_date: new Date(),
+      });
+    }
+    return;
+  }
+
+  async getAllOrders(filter: IFilterOrder) {
+    const orders = await this.orderRepository.getManyPaginate({
+      filter,
+      select: selectGeneralListOrders,
+    });
+
+    const statusMap: Record<
+      'Delivered' | 'Shipped' | 'Packed',
+      TypeStatusOrder
+    > = {
+      Delivered: TypeStatusOrder.DELIVERED,
+      Shipped: TypeStatusOrder.SHIPPED,
+      Packed: TypeStatusOrder.PACKED,
+    };
+
+    await Promise.all(
+      orders.data.map(async (order: ISelectGeneralListOrder) => {
+        if (order.expiredAt && order.expiredAt < new Date()) {
+          await this.orderRepository.update({
+            where: { id: order.id },
+            data: {
+              status: TypeStatusOrder.CANCELLED,
+              expiredAt: null,
+            },
+          });
+
+          if (order.voucherId) {
+            await this.voucherRepository.updateById({
+              id: order.voucherId,
+              data: {
+                quota: {
+                  increment: 1,
+                },
+              },
+            });
+          }
+
+          const isVa = this.gatewayXenditRepository.isVa(order.paymentMethod);
+          const orderCallbackPayment =
+            await this.orderCallbackPaymentRepository.getThrowByOrderId({
+              orderId: order.id,
+            });
+          if (isVa) {
+            await this.gatewayService.httpPatchVa(
+              orderCallbackPayment.xenditId,
+              {
+                expiration_date: new Date(),
+              },
+            );
+          }
+
+          order.status = TypeStatusOrder.CANCELLED;
+          order.expiredAt = null;
+        }
+
+        const isUpdatable =
+          order.status === TypeStatusOrder.ON_PROGRESS ||
+          order.status === TypeStatusOrder.PACKED ||
+          order.status === TypeStatusOrder.SHIPPED;
+
+        if (!isUpdatable || !order.trackId) return;
+      }),
+    );
+
+    return {
+      data: orders.data.map((order: ISelectGeneralListOrder) => {
+        return {
+          uuid: order.uuid,
+          trackId: order.trackId,
+          createdAt: order.createdAt,
+          name: order.name,
+          orderAddress: order.orderAddress,
+          totalPayment: order.totalPayment,
+          netAmount: order.netAmount,
+          isNetAmountCalculated: order.isNetAmountCalculated,
+          status: order.status,
+          expiredAt: order.expiredAt,
+        };
+      }),
+      meta: orders.meta,
+    };
+  }
+
+  async netOrder(dto: OrderNetDto) {
+    const transactions = await this.gatewayXenditRepository.httpGetTransactions(
+      {
+        startDate: dto.startDate,
+        endDate: dto.endDate,
+      },
+    );
+
+    const orders = await this.orderRepository.getMany({
+      where: {
+        createdAt: {
+          gte: new Date(dto.startDate),
+          lte: new Date(dto.endDate),
+        },
+      },
+      select: selectGeneralListOrders,
+    });
+
+    await Promise.all(
+      orders.map(async (order) => {
+        const ref = order.orderCallbackPayment;
+
+        const matchTransaction = transactions.data.find((transaction) => {
+          switch (transaction.channel_category) {
+            case 'VIRTUAL_ACCOUNT':
+              return transaction.reference_id === ref?.externalId;
+            case 'EWALLET':
+              return transaction.reference_id === ref?.referenceId;
+            case 'QR_CODE':
+              return transaction.reference_id === ref?.qrReferenceId;
+            case 'PAYLATER':
+              return transaction.reference_id === ref?.paylaterReferenceId;
+            case 'RETAIL_OUTLET':
+              return transaction.reference_id === ref?.retailOutletReferenceId;
+            default:
+              return false;
+          }
+        });
+
+        if (!matchTransaction) return null;
+
+        return await this.orderRepository.update({
+          where: {
+            id: order.id,
+          },
+          data: {
+            xenditFee: matchTransaction.fee.xendit_fee,
+            xenditFeeVat: matchTransaction.fee.value_added_tax,
+            netAmount: matchTransaction.net_amount,
+            isNetAmountCalculated: true,
+          },
+        });
+      }),
+    );
+  }
+
+  async getOrderByTrackId(trackId: string) {
+    let order = await this.orderRepository.getThrowByTrackId({
+      trackId,
+      select: selectGeneralTrackOrder,
+    });
+
+    if (order.expiredAt && order.expiredAt < new Date()) {
+      await this.orderRepository.update({
+        where: { id: order.id },
+        data: {
+          status: TypeStatusOrder.CANCELLED,
+          expiredAt: null,
+        },
+      });
+
+      if (order.voucherId) {
+        await this.voucherRepository.updateById({
+          id: order.voucherId,
+          data: {
+            quota: {
+              increment: 1,
+            },
+          },
+        });
+      }
+
+      const isVa = this.gatewayXenditRepository.isVa(order.paymentMethod);
+      const orderCallbackPayment =
+        await this.orderCallbackPaymentRepository.getThrowByOrderId({
+          orderId: order.id,
+        });
+      if (isVa) {
+        await this.gatewayService.httpPatchVa(orderCallbackPayment.xenditId, {
+          expiration_date: new Date(),
+        });
+      }
+
+      order.status = TypeStatusOrder.CANCELLED;
+      order.expiredAt = null;
+    }
+
+    const { id, voucherId, customerId, paymentMethod, ...response } = order;
+
+    return response;
+  }
+}

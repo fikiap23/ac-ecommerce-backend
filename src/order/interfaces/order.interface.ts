@@ -1,0 +1,44 @@
+import { Prisma, TypeStatusOrder } from '@prisma/client';
+import {
+  IEWalletWebhookResponse,
+  IPaylaterWebhookResponse,
+  IQrCodeWebhookResponse,
+  IRetailOutletWebhookResponse,
+  IVaWebhookResponse,
+} from 'src/gateway/interfaces/gateway-xendit.interface';
+import {
+  selectGeneralListOrders,
+  selectGeneralOrder,
+  selectOrderProductWithRelations,
+} from 'src/prisma/queries/order/props/select-order.prop';
+import { selectProductForCreateOrder } from 'src/prisma/queries/product/props/select-product.prop';
+
+export type ICreateOrder = Prisma.OrderCreateInput;
+
+export type ISelectProductForCreateOrder = Prisma.ProductGetPayload<{
+  select: typeof selectProductForCreateOrder;
+}>;
+
+export type IselectOrderProductWithRelations = Prisma.OrderProductGetPayload<{
+  select: typeof selectOrderProductWithRelations;
+}>;
+export type ISelectGeneralOrder = Prisma.OrderGetPayload<{
+  select: typeof selectGeneralOrder;
+}>;
+export type ISelectGeneralListOrder = Prisma.OrderGetPayload<{
+  select: typeof selectGeneralListOrders;
+}>;
+
+export type IFilterOrder = {
+  sort: Prisma.SortOrder;
+  page: number;
+  limit: number;
+  search?: string;
+  status?: TypeStatusOrder;
+};
+
+export type IOrderPayment = IVaWebhookResponse &
+  IEWalletWebhookResponse &
+  IQrCodeWebhookResponse &
+  IPaylaterWebhookResponse &
+  IRetailOutletWebhookResponse;

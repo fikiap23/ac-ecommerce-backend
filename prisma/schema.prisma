@@ -1,0 +1,460 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TypeRoleUser {
+  CUSTOMER
+  SUB_DEALER
+  DEALER
+}
+
+enum TypeRoleAdmin {
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum TypeStatusVoucher {
+  FINISH
+  ON_GOING
+  NOT_YET_READY
+}
+
+enum TypeVoucher {
+  FIXED
+  PERCENTAGE
+}
+
+enum TypeStatusOrder {
+  WAITING_PAYMENT
+  CANCELLED
+  ON_PROGRESS
+  PACKED
+  SHIPPED
+  DELIVERED
+}
+
+enum ProductType {
+  SINGLE
+  BUNDLE
+}
+
+enum ServiceType {
+  PRODUCT
+  SERVICE
+}
+
+enum TypeProduct {
+  INVERTER
+  NON_INVERTER
+}
+
+enum TypeProductPackage {
+  SINGLE
+  BUNDLE
+}
+
+enum TypeProductService {
+  PRODUCT
+  SERVICE
+}
+
+model Customer {
+  id          Int          @id @default(autoincrement())
+  uuid        String       @unique @default(uuid())
+  profilePic  String
+  name        String
+  phoneNumber String?      @unique
+  email       String       @unique
+  role        TypeRoleUser @default(CUSTOMER)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  customerProduct CustomerProduct[]
+  customerAdress  CustomerAddress[]
+  customerVoucher CustomerVoucher[]
+}
+
+model CustomerProduct {
+  id        Int      @id @default(autoincrement())
+  uuid      String   @unique @default(uuid())
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId Int?
+  product    Product?  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId  Int?
+}
+
+model CustomerAddress {
+  id              Int      @id @default(autoincrement())
+  uuid            String   @unique @default(uuid())
+  province        String
+  city            String
+  subDistrict     String
+  suburbOrVillage String
+  postalCode      String
+  label           String
+  address         String
+  details         String?
+  isMain          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId Int
+}
+
+model CustomerVoucher {
+  id         Int      @id @default(autoincrement())
+  uuid       String   @unique @default(uuid())
+  usageCount Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId Int?
+  voucher    Voucher?  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  voucherId  Int?
+
+  @@unique([customerId, voucherId])
+}
+
+model UserAdmin {
+  id        Int           @id @default(autoincrement())
+  uuid      String        @unique @default(uuid())
+  fullname  String
+  username  String        @unique
+  email     String        @unique
+  password  String
+  role      TypeRoleAdmin @default(ADMIN)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model BannerCampaign {
+  id        Int      @id @default(autoincrement())
+  uuid      String   @unique @default(uuid())
+  title     String
+  image     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Testimonial {
+  id                 Int      @id @default(autoincrement())
+  uuid               String   @unique @default(uuid())
+  name               String
+  cityOrDistrict     String
+  productDescription String?
+  description        String   @db.Text
+  videoOrImage       String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model CategoryProduct {
+  id        Int      @id @default(autoincrement())
+  uuid      String   @unique @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product[]
+}
+
+model Product {
+  id          Int                @id @default(autoincrement())
+  uuid        String             @unique @default(uuid())
+  packageType TypeProductPackage @default(SINGLE)
+  serviceType TypeProductService @default(PRODUCT)
+  name        String
+  brand       String?
+  description String             @db.Text
+  type        TypeProduct?       @default(INVERTER)
+  model       String?
+  capacity    Decimal?           @db.Decimal(3, 2)
+  price       Int
+  salePrice   Int?
+  isActive    Boolean            @default(true)
+  stock       Int?               @default(0)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  deletedAt   DateTime?
+
+  categoryProductId Int
+  categoryProduct   CategoryProduct @relation(fields: [categoryProductId], references: [id], onDelete: Cascade)
+
+  productBundleItems ProductBundleItem[]
+  customerProduct    CustomerProduct[]
+  productVariant     ProductVariant[]
+  productImage       ProductImage[]
+  productVoucer      ProductVoucer[]
+}
+
+model Bundle {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String    @db.Text
+  minusPrice  Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  items ProductBundleItem[]
+}
+
+model ProductBundleItem {
+  id        Int @id @default(autoincrement())
+  bundleId  Int
+  productId Int
+
+  bundle  Bundle  @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([bundleId, productId])
+}
+
+model ProductVariant {
+  id            Int      @id @default(autoincrement())
+  uuid          String   @unique @default(uuid())
+  productId     Int
+  photoUrl      String?
+  name          String
+  code          String
+  stock         Int
+  regularPrice  Decimal  @db.Decimal(10, 2)
+  salePrice     Decimal? @db.Decimal(10, 2)
+  specification String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model ProductImage {
+  id        Int      @id @default(autoincrement())
+  uuid      String   @unique @default(uuid())
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId Int
+}
+
+model Voucher {
+  id          Int               @id @default(autoincrement())
+  uuid        String            @unique @default(uuid())
+  name        String
+  description String            @db.Text
+  startDate   DateTime
+  endDate     DateTime
+  status      TypeStatusVoucher
+  type        TypeVoucher
+
+  // common
+  discountAmount    Int
+  minimumAmount     Int?
+  quota             Int?
+  claimLimitPerUser Int?
+
+  // only for percentage
+  maxDiscount Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customerVoucher CustomerVoucher[]
+  productVoucher  ProductVoucer[]
+}
+
+model ProductVoucer {
+  id        Int      @id @default(autoincrement())
+  uuid      String   @unique @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId Int
+  voucher   Voucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  voucherId Int
+}
+
+model Order {
+  id                    Int             @id @default(autoincrement())
+  uuid                  String          @unique @default(uuid())
+  trackId               String          @unique
+  name                  String
+  email                 String
+  phoneNumber           String
+  paymentMethod         String
+  deliveryService       String
+  totalWeight           String?
+  cashback              Int             @default(0)
+  subTotalPay           Int
+  exchangePoint         Int             @default(0)
+  voucherDiscount       Int             @default(0)
+  deliveryFee           Int
+  totalPayment          Int
+  xenditFee             Int?            @default(0)
+  xenditFeeVat          Int?            @default(0)
+  netAmount             Int?            @default(0)
+  isNetAmountCalculated Boolean?        @default(false)
+  customerId            Int?
+  voucherId             Int?
+  status                TypeStatusOrder @default(WAITING_PAYMENT)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  expiredAt DateTime?
+
+  orderAddress         OrderAddress?
+  orderProduct         OrderProduct[]
+  orderVoucher         OrderVoucher?
+  orderCallbackPayment OrderCallbackPayment?
+}
+
+model OrderAddress {
+  id              Int      @id @default(autoincrement())
+  uuid            String   @unique @default(uuid())
+  province        String
+  city            String
+  subDistrict     String
+  suburbOrVillage String
+  postalCode      String
+  label           String
+  address         String
+  details         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId Int   @unique
+}
+
+model OrderProduct {
+  id          Int       @id @default(autoincrement())
+  uuid        String    @unique @default(uuid())
+  name        String
+  category    String
+  description String    @db.Text
+  price       Int
+  quantity    Int
+  discount    Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  orderProductImage OrderProductImage[]
+
+  orderProductId Int
+
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId Int
+}
+
+model OrderProductImage {
+  id        Int      @id @default(autoincrement())
+  uuid      String   @unique @default(uuid())
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orderProduct   OrderProduct @relation(fields: [orderProductId], references: [id], onDelete: Cascade)
+  orderProductId Int
+}
+
+model OrderPaymentMethod {
+  id        Int      @id @default(autoincrement())
+  uuid      String   @unique @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OrderDeliveryService {
+  id           Int      @id @default(autoincrement())
+  uuid         String   @unique @default(uuid())
+  courierId    String
+  courierName  String
+  deliveryType String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model OrderVoucher {
+  id          Int         @id @default(autoincrement())
+  uuid        String      @unique @default(uuid())
+  name        String
+  description String      @db.Text
+  startDate   DateTime
+  endDate     DateTime
+  type        TypeVoucher
+
+  // common
+  discountAmount    Int
+  minimumAmount     Int?
+  claimLimitPerUser Int?
+
+  // only for percentage
+  maxDiscount Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId Int   @unique
+}
+
+model OrderCallbackPayment {
+  id       Int    @id @default(autoincrement())
+  uuid     String @unique @default(uuid())
+  xenditId String @unique
+
+  // va
+  va         String?
+  externalId String? @unique
+
+  // ewallet
+  referenceId         String? @unique
+  // callback ewallet
+  desktopCheckoutUrl  String?
+  mobileCheckoutUrl   String?
+  deepLinkCheckoutUrl String?
+  qrCheckoutString    String?
+
+  // qr code
+  qrString      String?
+  qrReferenceId String? @unique
+
+  // paylater
+  paylaterReferenceId               String? @unique
+  // callback paylater
+  paylaterDesktopWebCheckoutUrl     String?
+  paylaterMobileWebCheckoutUrl      String?
+  paylaterMobileDeeplinkCheckoutUrl String?
+
+  // retail outlet
+  retailOutletCode        String?
+  retailOutletReferenceId String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId Int   @unique
+}
