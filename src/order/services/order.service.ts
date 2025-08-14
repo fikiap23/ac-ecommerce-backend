@@ -261,36 +261,41 @@ export class OrderService {
           subTotalPay,
           deliveryFee,
           totalPayment,
+
           orderAddress: {
             create: dto.shippingAddress,
           },
+
           orderProduct: {
             create: products.map((p) => {
               const cartItem = dto.carts.find((c) => c.productUuid === p.uuid);
 
               return {
-                ...omit(p, [
-                  'id',
-                  'uuid',
-                  'categoryProduct',
-                  'productImage',
-                  'productVoucher',
-                  'isActive',
-                ]),
+                name: p.name,
+                brand: p.brand,
+                description: p.description,
+                type: p.type,
+                model: p.model,
+                capacity: p.capacity,
+                price: p.price,
+                salePrice: p.salePrice,
+                packageType: p.packageType,
+                serviceType: p.serviceType,
+
                 category: p.categoryProduct.name,
                 orderProductId: p.id,
-                quantity: cartItem.quantity,
+                quantity: cartItem?.quantity ?? 0,
                 discount: 0,
+
                 createdAt: new Date(),
                 updatedAt: new Date(),
+
                 orderProductImage: {
-                  create: p.productImage.map(
-                    ({ id, uuid, productId, ...pi }) => ({
-                      ...pi,
-                      createdAt: new Date(),
-                      updatedAt: new Date(),
-                    }),
-                  ),
+                  create: p.productImage.map((pi) => ({
+                    url: pi.url,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                  })),
                 },
               };
             }),

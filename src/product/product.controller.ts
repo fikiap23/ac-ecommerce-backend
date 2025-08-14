@@ -44,10 +44,7 @@ export class ProductController {
   @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN)
   @Post('product')
   @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'productImages', maxCount: 5 },
-      { name: 'salesImages' },
-    ]),
+    FileFieldsInterceptor([{ name: 'productImages', maxCount: 5 }]),
   )
   async createProduct(
     @Body() dto: CreateProductDto,
@@ -59,11 +56,7 @@ export class ProductController {
     },
   ) {
     try {
-      await this.productService.create(
-        dto,
-        files.productImages,
-        files.salesImages,
-      );
+      await this.productService.create(dto, files.productImages);
       return formatResponse(res, HttpStatus.CREATED, null);
     } catch (error) {
       errorHandler(res, error);

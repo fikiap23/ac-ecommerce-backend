@@ -33,7 +33,7 @@ export const selectProductForCreateOrder: Prisma.ProductSelect = {
   deletedAt: true,
   categoryProduct: true,
   productImage: true,
-  productVoucher: true,
+  productVoucer: true,
 };
 
 export const selectProductForCreateCustomerProduct: Prisma.ProductSelect = {

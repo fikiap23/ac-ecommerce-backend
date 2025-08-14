@@ -347,16 +347,22 @@ model OrderAddress {
 }
 
 model OrderProduct {
-  id          Int       @id @default(autoincrement())
-  uuid        String    @unique @default(uuid())
+  id          Int                 @id @default(autoincrement())
+  uuid        String              @unique @default(uuid())
+  packageType TypeProductPackage?
+  serviceType TypeProductService?
   name        String
-  category    String
-  description String    @db.Text
+  brand       String?
+  description String              @db.Text
+  type        TypeProduct?        @default(INVERTER)
+  model       String?
+  capacity    Decimal?            @db.Decimal(3, 2)
   price       Int
+  category    String
   quantity    Int
   discount    Int
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
   deletedAt   DateTime?
 
   orderProductImage OrderProductImage[]
