@@ -185,7 +185,7 @@ model Product {
   description String             @db.Text
   type        TypeProduct?       @default(INVERTER)
   model       String?
-  capacity    Decimal?           @db.Decimal(3, 2)
+  capacity    Decimal?           @db.Decimal(10, 2)
   price       Int
   salePrice   Int?
   isActive    Boolean            @default(true)
@@ -242,7 +242,7 @@ model ProductVariant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  product Product @relation(fields: [productId], references: [id])
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
 model ProductImage {

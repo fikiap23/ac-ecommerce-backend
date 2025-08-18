@@ -44,7 +44,7 @@ export class ProductRepository {
       .map((url) => ({ url }));
   }
 
-  async uploadBulkProductSalesImages(salesImages: Express.Multer.File[]) {
+  async uploadBulkProductVariantImages(salesImages: Express.Multer.File[]) {
     const salesImagePayload = salesImages.map((img) => {
       const fileName = genIdPrefixTimestamp(genSlug(img.originalname));
       return {
@@ -54,7 +54,7 @@ export class ProductRepository {
           tribe: process.env.TRIBE_STORAGE_BUCKET,
           service: 'e-commerce/',
           module: 'product/',
-          subFolder: 'sales/',
+          subFolder: 'variant/',
         },
         files: img,
       };

@@ -2,6 +2,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -16,6 +17,35 @@ import {
   TypeProductPackage,
   TypeProductService,
 } from '@prisma/client';
+
+export class CreateProductVariantDto {
+  @IsOptional()
+  @IsString()
+  uuid?: string;
+
+  @IsString()
+  name: string;
+
+  @IsString()
+  code: string;
+
+  @IsInt()
+  stock: number;
+
+  @Type(() => Number)
+  @IsNumber()
+  regularPrice: number;
+
+  @IsOptional()
+  @IsNumber()
+  salePrice?: number;
+
+  @IsOptional()
+  @IsString()
+  specification?: string;
+
+  image?: Express.Multer.File[];
+}
 
 export class CreateProductDto {
   @IsString()
@@ -67,8 +97,16 @@ export class CreateProductDto {
   isActive?: boolean = true;
 
   @IsOptional()
-  @IsNumber()
-  stock?: number = 0;
+  @IsInt()
+  stock: number;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateProductVariantDto)
+  variants: CreateProductVariantDto[];
+
+  productImages?: Express.Multer.File[];
 }
 
 export class ProductImageData {
@@ -77,23 +115,7 @@ export class ProductImageData {
   url: string;
 }
 
-export class UpdateProductDto extends PartialType(CreateProductDto) {
-  @IsArray()
-  @IsOptional()
-  @ValidateNested({ each: true })
-  @Type(() => ProductImageData)
-  @Transform(({ value }) => {
-    if (typeof value === 'string') {
-      try {
-        return JSON.parse(value);
-      } catch (e) {
-        return [];
-      }
-    }
-    return value;
-  })
-  productImageData: ProductImageData[];
-}
+export class UpdateProductDto extends PartialType(CreateProductDto) {}
 
 export class QueryProductDto extends SearchPaginationDto {
   @IsOptional()

@@ -17,7 +17,10 @@ import { ProductService } from './services/product.service';
 import { JwtGuard, RoleGuard } from 'src/auth/guard';
 import { Roles } from 'src/auth/decorator';
 import { TypeRoleAdmin } from '@prisma/client';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import {
+  AnyFilesInterceptor,
+  FileFieldsInterceptor,
+} from '@nestjs/platform-express';
 import {
   CreateProductDto,
   QueryProductDto,
@@ -44,20 +47,43 @@ export class ProductController {
   @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN)
   @Post('product')
   @UseInterceptors(
-    FileFieldsInterceptor([{ name: 'productImages', maxCount: 5 }]),
+    AnyFilesInterceptor({
+      fileFilter: imageFileFilter,
+      limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
+    }),
   )
   async createProduct(
     @Body() dto: CreateProductDto,
     @Res() res: Response,
-    @UploadedFiles()
-    files: {
-      productImages?: Express.Multer.File[];
-      salesImages?: Express.Multer.File[];
-    },
+    @UploadedFiles() files: Express.Multer.File[],
   ) {
     try {
-      await this.productService.create(dto, files.productImages);
-      return formatResponse(res, HttpStatus.CREATED, null);
+      // === Extract and map variant images from files ===
+      const variantImagesMap = {} as Record<number, Express.Multer.File[]>;
+
+      for (const file of files) {
+        const variantMatch = file.fieldname.match(/variants\[(\d+)]\[image]/);
+        if (variantMatch) {
+          const index = +variantMatch[1];
+          variantImagesMap[index] = variantImagesMap[index] || [];
+          variantImagesMap[index].push(file);
+        } else if (file.fieldname === 'productImages') {
+          dto.productImages = dto.productImages || [];
+          dto.productImages.push(file);
+        }
+      }
+
+      if (dto.variants && Array.isArray(dto.variants)) {
+        dto.variants = dto.variants.map((variant, idx) => {
+          return {
+            ...variant,
+            image: variantImagesMap[idx] || [],
+          };
+        });
+      }
+
+      const result = await this.productService.create(dto);
+      return formatResponse(res, HttpStatus.CREATED, result.uuid);
     } catch (error) {
       errorHandler(res, error);
     }
@@ -87,27 +113,42 @@ export class ProductController {
   @Roles(TypeRoleAdmin.SUPER_ADMIN)
   @Put('product/:uuid')
   @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'productImages', maxCount: 5 },
-      { name: 'salesImages' },
-    ]),
+    AnyFilesInterceptor({
+      fileFilter: imageFileFilter,
+      limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
+    }),
   )
   async updateProductByUuid(
     @Param('uuid') uuid: string,
     @Body() dto: UpdateProductDto,
     @Res() res: Response,
-    @UploadedFiles()
-    files: {
-      productImages?: Express.Multer.File[];
-      salesImages?: Express.Multer.File[];
-    },
+    @UploadedFiles() files: Express.Multer.File[],
   ) {
     try {
-      await this.productService.updateProductByUuid(
-        uuid,
-        dto,
-        files.productImages,
-      );
+      // === Extract and map variant images from files ===
+      const variantImagesMap = {} as Record<number, Express.Multer.File[]>;
+
+      for (const file of files) {
+        const variantMatch = file.fieldname.match(/variants\[(\d+)]\[image]/);
+        if (variantMatch) {
+          const index = +variantMatch[1];
+          variantImagesMap[index] = variantImagesMap[index] || [];
+          variantImagesMap[index].push(file);
+        } else if (file.fieldname === 'productImages') {
+          dto.productImages = dto.productImages || [];
+          dto.productImages.push(file);
+        }
+      }
+
+      if (dto.variants && Array.isArray(dto.variants)) {
+        dto.variants = dto.variants.map((variant, idx) => {
+          return {
+            ...variant,
+            image: variantImagesMap[idx] || [],
+          };
+        });
+      }
+      await this.productService.updateProductByUuid(uuid, dto);
       return formatResponse(res, HttpStatus.OK, null);
     } catch (error) {
       errorHandler(res, error);

@@ -18,26 +18,61 @@ export class ProductService {
     private readonly productValidateRepository: ProductValidateRepository,
   ) {}
 
-  async create(dto: CreateProductDto, productImages: Express.Multer.File[]) {
+  async create(dto: CreateProductDto) {
+    const { categoryProductUuid, productImages, variants, ...cleanDto } = dto;
+
+    //Validate product images
     this.productValidateRepository.validateProductImages(productImages);
 
+    //  Find category
     const categoryProduct = await this.categoryProductRepository.getThrowByUuid(
       {
         uuid: dto.categoryProductUuid,
       },
     );
 
-    let isActive: boolean = true;
-
+    //  Upload product images
     const productImageUrls =
       await this.productRepository.uploadBulkProductImages(productImages);
 
-    const { categoryProductUuid, ...cleanDto } = dto;
+    //  Variants
+    const variantData: Prisma.ProductVariantCreateWithoutProductInput[] =
+      variants?.length
+        ? await Promise.all(
+            variants.map(
+              async (
+                variant,
+              ): Promise<Prisma.ProductVariantCreateWithoutProductInput> => {
+                let photoUrl: string | undefined;
 
+                // Upload variant images
+                if (variant.image?.length) {
+                  const [uploaded] =
+                    await this.productRepository.uploadBulkProductImages([
+                      variant.image[0],
+                    ]);
+                  photoUrl = uploaded.url;
+                }
+
+                return {
+                  name: variant.name,
+                  code: variant.code,
+                  stock: variant.stock,
+                  regularPrice: variant.regularPrice,
+                  salePrice: variant.salePrice,
+                  specification: variant.specification,
+                  photoUrl,
+                };
+              },
+            ),
+          )
+        : [];
+
+    //  Create product with nested images & variants
     return await this.productRepository.create({
       data: {
         ...cleanDto,
-        isActive,
+        isActive: dto.isActive ?? true,
         categoryProduct: {
           connect: { id: categoryProduct.id },
         },
@@ -46,6 +81,11 @@ export class ProductService {
             data: productImageUrls,
           },
         },
+        ...(variantData.length && {
+          productVariant: {
+            create: variantData,
+          },
+        }),
       },
     });
   }
@@ -85,68 +125,89 @@ export class ProductService {
     };
   }
 
-  async updateProductByUuid(
-    uuid: string,
-    dto: UpdateProductDto,
-    productImages?: Express.Multer.File[],
-  ) {
-    const product = await this.productRepository.getThrowByUuid({ uuid });
+  async updateProductByUuid(uuid: string, dto: UpdateProductDto) {
+    // validate
+    await this.productRepository.getThrowByUuid({ uuid });
 
-    const categoryProduct = await this.categoryProductRepository.getThrowByUuid(
-      {
-        uuid: dto.categoryProductUuid,
-      },
-    );
+    // resolve category
+    const category = await this.categoryProductRepository.getThrowByUuid({
+      uuid: dto.categoryProductUuid,
+    });
 
-    const { categoryProductUuid, isActive, productImageData, ...updateFields } =
-      dto;
+    const {
+      categoryProductUuid,
+      isActive,
+      productImages,
+      variants,
+      ...updateFields
+    } = dto;
 
-    let updateProductImage: Prisma.ProductImageCreateInput[] = (
-      productImageData ?? []
-    ).map((item) => ({
-      url: item?.url,
-      product: { connect: { id: product.id } },
-    }));
-
+    // handle product images
+    let updateProductImage: Prisma.ProductImageCreateManyProductInput[] = [];
     if (productImages?.length) {
       const uploaded = await this.productRepository.uploadBulkProductImages(
         productImages,
       );
-
-      let urlIdx = 0;
-
-      updateProductImage = updateProductImage.map((item) => {
-        if (item.url === '' && urlIdx < uploaded.length) {
-          item.url = uploaded[urlIdx].url;
-          urlIdx++;
-        }
-        return item;
-      });
-
-      for (; urlIdx < uploaded.length; urlIdx++) {
-        updateProductImage.push({
-          url: uploaded[urlIdx].url,
-          product: { connect: { id: product.id } },
-        });
-      }
+      updateProductImage = productImages.map((item, idx) => ({
+        url: typeof item === 'string' ? item : uploaded[idx]?.url,
+      }));
     }
 
-    return await this.productRepository.updateByUuid({
+    // handle product variants
+    const variantOps = variants?.length
+      ? await Promise.all(
+          variants.map(async (variant) => {
+            let photoUrl: string | undefined;
+
+            if (variant.image?.length) {
+              const [uploaded] =
+                await this.productRepository.uploadBulkProductImages([
+                  variant.image[0],
+                ]);
+              photoUrl = uploaded.url;
+            }
+
+            const baseData = {
+              name: variant.name,
+              code: variant.code,
+              stock: variant.stock,
+              regularPrice: variant.regularPrice,
+              salePrice: variant.salePrice,
+              specification: variant.specification,
+              ...(photoUrl ? { photoUrl } : {}),
+            };
+
+            return variant.uuid
+              ? {
+                  where: { uuid: variant.uuid },
+                  update: baseData,
+                  create: baseData,
+                }
+              : {
+                  where: { uuid: '' },
+                  update: {},
+                  create: baseData,
+                };
+          }),
+        )
+      : [];
+
+    // update product
+    return this.productRepository.updateByUuid({
       uuid,
       data: {
         ...updateFields,
         isActive,
-        categoryProduct: { connect: { id: categoryProduct.id } },
+        categoryProduct: { connect: { id: category.id } },
         productImage: {
           deleteMany: {},
-          createMany: {
-            data: updateProductImage.map((item) => {
-              const { product, ...rest } = item;
-
-              return rest;
-            }),
-          },
+          ...(updateProductImage.length
+            ? { createMany: { data: updateProductImage } }
+            : {}),
         },
+        ...(variantOps.length
+          ? { productVariant: { upsert: variantOps } }
+          : {}),
       },
     });
   }

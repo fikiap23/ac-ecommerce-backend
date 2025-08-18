@@ -19,6 +19,8 @@ export const selectGeneralProduct: Prisma.ProductSelect = {
       url: true,
     },
   },
+
+  productVariant: true,
 };
 
 export const selectProductForCreateOrder: Prisma.ProductSelect = {
