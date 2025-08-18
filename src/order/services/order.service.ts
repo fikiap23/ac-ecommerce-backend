@@ -67,6 +67,9 @@ export class OrderService {
   }
 
   async createOrder(sub: string, dto: CreateOrderDto) {
+    const customer = await this.customerRepository.getThrowByUuid({
+      uuid: sub,
+    });
     const products = await this.productRepository.getMany({
       where: {
         uuid: { in: dto.carts.map((c) => c.productUuid) },
@@ -106,8 +109,6 @@ export class OrderService {
 
     const isMembership = sub;
     const useVoucher = isMembership && dto.voucherUuid;
-
-    let customer: Customer | null = null;
 
     // Hitung total berdasarkan variant
     subTotalPay = await this.orderRepository.calculateTotalAmount(
@@ -268,7 +269,7 @@ export class OrderService {
           subTotalPay,
           deliveryFee,
           totalPayment,
-
+          customerId: customer.id,
           orderAddress: {
             create: dto.shippingAddress,
           },

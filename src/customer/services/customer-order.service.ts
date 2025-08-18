@@ -34,15 +34,6 @@ export class CustomerOrderService {
       select: SelectGeneralCustomerOrder,
     });
 
-    const statusMap: Record<
-      'Delivered' | 'Shipped' | 'Packed',
-      TypeStatusOrder
-    > = {
-      Delivered: TypeStatusOrder.DELIVERED,
-      Shipped: TypeStatusOrder.SHIPPED,
-      Packed: TypeStatusOrder.PACKED,
-    };
-
     await Promise.all(
       orders.data.map(async (order: ISelectGeneralCustomerOrder) => {
         if (order.expiredAt && order.expiredAt < new Date()) {

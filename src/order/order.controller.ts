@@ -16,16 +16,18 @@ import { Response } from 'express';
 import { formatResponse } from 'helpers/http.helper';
 import { errorHandler } from 'helpers/validation.helper';
 import { JwtGuard, RoleGuard } from 'src/auth/guard';
-import { TypeRoleAdmin } from '@prisma/client';
+import { TypeRoleAdmin, TypeRoleUser } from '@prisma/client';
 import { Roles } from 'src/auth/decorator';
 import { OrderPaymentMethodService } from './services/order-payment-method.service';
 import { IOrderPayment } from './interfaces/order.interface';
+import { AuthService } from 'src/auth/auth.service';
 
 @Controller()
 export class OrderController {
   constructor(
     private readonly orderService: OrderService,
     private readonly orderPaymentMethodService: OrderPaymentMethodService,
+    private readonly authService: AuthService,
   ) {}
 
   @Get('payment-method')
@@ -38,14 +40,16 @@ export class OrderController {
     }
   }
 
+  @UseGuards(JwtGuard)
+  @Roles(TypeRoleUser.CUSTOMER)
   @Post('order')
   async createOrder(
     @Headers('authorization') authorization: string,
     @Body() dto: CreateOrderDto,
     @Res() res: Response,
   ) {
-    const sub = await this.orderService.validateMembership(authorization);
     try {
+      const { sub } = await this.authService.decodeJwtToken(authorization);
       const result = await this.orderService.createOrder(sub, dto);
       return formatResponse(res, HttpStatus.CREATED, result);
     } catch (error) {
