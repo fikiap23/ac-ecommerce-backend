@@ -26,7 +26,13 @@ export class OrderRepository {
 
   async calculateTotalAmount(
     carts: CreateOrderDto['carts'],
-    products: ISelectProductForCreateOrder[],
+    products: (ISelectProductForCreateOrder & {
+      productVariant: {
+        uuid: string;
+        salePrice: number | null;
+        regularPrice: number;
+      }[];
+    })[],
   ): Promise<number> {
     const productMap = new Map(products.map((p) => [p.uuid, p]));
 
@@ -34,10 +40,28 @@ export class OrderRepository {
 
     for (const cartItem of carts) {
       const product = productMap.get(cartItem.productUuid);
-      if (product) {
-        const priceToUse = product.price;
-        totalAmount += priceToUse * cartItem.quantity;
+
+      if (!product) {
+        throw new CustomError({
+          message: `Produk dengan UUID ${cartItem.productUuid} tidak ditemukan`,
+          statusCode: 404,
+        });
       }
+
+      const variant = product.productVariant.find(
+        (v) => v.uuid === cartItem.productVariantUuid,
+      );
+
+      if (!variant) {
+        throw new CustomError({
+          message: `Varian produk tidak ditemukan untuk produk ${product.name}`,
+          statusCode: 404,
+        });
+      }
+
+      const priceToUse = variant.salePrice ?? variant.regularPrice;
+
+      totalAmount += Number(priceToUse) * cartItem.quantity;
     }
 
     return totalAmount;

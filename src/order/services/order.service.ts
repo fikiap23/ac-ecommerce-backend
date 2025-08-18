@@ -74,7 +74,12 @@ export class OrderService {
       },
       select: selectProductForCreateOrder,
     });
-    await this.orderValidateRepository.validateProducts(dto.carts, products);
+
+    // Validasi produk + variant
+    await this.orderValidateRepository.validateProductsWithVariants(
+      dto.carts,
+      products,
+    );
 
     const isVa = this.gatewayXenditRepository.isVa(dto.paymentMethod);
     const isEwallet = this.gatewayXenditRepository.isEwallet(dto.paymentMethod);
@@ -85,6 +90,7 @@ export class OrderService {
     const isRetailOutlet = this.gatewayXenditRepository.isRetailOutlet(
       dto.paymentMethod,
     );
+
     this.orderValidateRepository.validatePaymentMethod(
       isVa,
       isEwallet,
@@ -103,10 +109,12 @@ export class OrderService {
 
     let customer: Customer | null = null;
 
+    // Hitung total berdasarkan variant
     subTotalPay = await this.orderRepository.calculateTotalAmount(
       dto.carts,
       products,
     );
+
     this.orderValidateRepository.validateSubTotalPay(
       subTotalPay,
       dto.subTotalPay,
@@ -119,6 +127,7 @@ export class OrderService {
         uuid: dto.voucherUuid,
         select: selectVoucherForCalculate,
       });
+
       voucherDiscount = await this.orderRepository.calculateVoucher({
         voucher,
         customerId: customer.id,
@@ -126,10 +135,12 @@ export class OrderService {
         products,
         subTotalPay,
       });
+
       this.orderValidateRepository.validateVoucherDiscount(
         voucherDiscount,
         dto.voucherDiscount,
       );
+
       totalPayment -= voucherDiscount;
     }
 
@@ -137,12 +148,6 @@ export class OrderService {
 
     totalPayment += deliveryFee;
 
-    console.log({
-      subTotalPay,
-      voucherDiscount,
-      deliveryFee,
-      totalPayment,
-    });
     this.orderValidateRepository.validateTotalPayment(
       totalPayment,
       dto.totalPayment,
@@ -153,8 +158,11 @@ export class OrderService {
     let qrCode: IQrCodeResponse | null = null;
     let paylater: IPaylaterChargeResponse | null = null;
     let retailOutlet: IRetailOutletResponse | null = null;
+
     const orderRefId = `order-${Date.now().toString()}-${genRandomNumber(20)}`;
     const trackId = this.orderRepository.genTrackId(20);
+
+    // === Payment gateway (tetap sama) ===
     if (isVa) {
       va = await this.gatewayService.httpPostCreateVa({
         expected_amount: totalPayment,
@@ -172,7 +180,6 @@ export class OrderService {
         amount: totalPayment,
         checkout_method: 'ONE_TIME_PAYMENT',
         channel_code: dto.paymentMethod,
-        callback_url: 'https://baa902780ef7.ngrok-free.app/order-payment',
         channel_properties: isOVO
           ? { mobile_number: dto.phoneNumber }
           : {
@@ -269,6 +276,9 @@ export class OrderService {
           orderProduct: {
             create: products.map((p) => {
               const cartItem = dto.carts.find((c) => c.productUuid === p.uuid);
+              const variant = p.productVariant.find(
+                (v) => v.uuid === cartItem.productVariantUuid,
+              );
 
               return {
                 name: p.name,
@@ -277,13 +287,13 @@ export class OrderService {
                 type: p.type,
                 model: p.model,
                 capacity: p.capacity,
-                price: p.price,
-                salePrice: p.salePrice,
+                price: variant.salePrice ?? variant.regularPrice,
                 packageType: p.packageType,
                 serviceType: p.serviceType,
 
                 category: p.categoryProduct.name,
                 orderProductId: p.id,
+                orderProductVariantId: variant.id,
                 quantity: cartItem?.quantity ?? 0,
                 discount: 0,
 
@@ -337,23 +347,20 @@ export class OrderService {
       if (useVoucher) {
         await tx.voucher.update({
           where: { uuid: dto.voucherUuid },
-          data: {
-            quota: {
-              decrement: 1,
-            },
-          },
+          data: { quota: { decrement: 1 } },
         });
       }
 
       return createdOrder;
     });
 
+    // Kirim invoice email
     await this.mailService.sendInvoice({
-      subject: '[NEO] Awaiting Payment - Your Order',
-      title: 'Complete Your Order',
+      subject: '[NEO] Menunggu Pembayaran - Pesanan Anda',
+      title: 'Selesaikan Pesanan Anda',
       description:
-        'Just created an order? 📝 Click Complete Your Order, enter your Order ID, and follow the steps to make your payment and confirm it! 💳🛒',
-      buttonText: 'Complete Your Order',
+        'Baru saja membuat pesanan? 📝 Klik Selesaikan Pesanan, masukkan ID Pesanan Anda, lalu ikuti langkah-langkah untuk melakukan pembayaran dan konfirmasi! 💳🛒',
+      buttonText: 'Selesaikan Pesanan',
       link: `${process.env.FRONTEND_URL}/payment/${trackId}`,
       email: data.email,
       order: {
@@ -362,12 +369,21 @@ export class OrderService {
         phone: data.phoneNumber,
         email: data.email,
         address: data.orderAddress.address,
-        products: products.map((p) => ({
-          name: p.name,
-          price: p?.price?.toString(),
-          qty: dto.carts.find((c) => c.productUuid === p.uuid).quantity,
-          discount: '0',
-        })),
+        products: products.map((p) => {
+          const cartItem = dto.carts.find((c) => c.productUuid === p.uuid);
+          const variant = p.productVariant.find(
+            (v) => v.uuid === cartItem.productVariantUuid,
+          );
+
+          return {
+            name: `${p.name} - ${variant.name}`,
+            price: variant.salePrice
+              ? variant.salePrice.toString()
+              : variant.regularPrice.toString(),
+            qty: cartItem.quantity,
+            discount: '0',
+          };
+        }),
         subtotal: data.subTotalPay.toString(),
         totalDiscount:
           sub && dto.voucherUuid ? dto.voucherDiscount.toString() : '0',
@@ -380,9 +396,7 @@ export class OrderService {
       },
     });
 
-    return {
-      orderId: trackId,
-    };
+    return { orderId: trackId };
   }
 
   async getOrderByUuid(uuid: string) {

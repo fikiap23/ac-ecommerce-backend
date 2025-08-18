@@ -91,27 +91,10 @@ export class ProductService {
   }
 
   async getAll(filter: IFilterProduct) {
-    const products = await this.productRepository.getManyPaginate({
+    return await this.productRepository.getManyPaginate({
       filter,
       select: selectGeneralProduct,
     });
-
-    const enrichedProducts = await Promise.all(
-      products.data.map(async (product: ISelectGeneralProduct) => {
-        let totalStock = null;
-        let mainStock = null;
-
-        return {
-          ...product,
-          stock: !mainStock ? totalStock : mainStock,
-        };
-      }),
-    );
-
-    return {
-      ...products,
-      data: enrichedProducts,
-    };
   }
 
   async getByUuid(uuid: string) {

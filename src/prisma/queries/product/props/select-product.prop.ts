@@ -36,6 +36,7 @@ export const selectProductForCreateOrder: Prisma.ProductSelect = {
   categoryProduct: true,
   productImage: true,
   productVoucer: true,
+  productVariant: true,
 };
 
 export const selectProductForCreateCustomerProduct: Prisma.ProductSelect = {

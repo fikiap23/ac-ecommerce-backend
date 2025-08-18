@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CustomError } from 'helpers/http.helper';
 import { AuthService } from 'src/auth/auth.service';
 import { CreateOrderDto } from '../dto/order.dto';
-import { Product, TypeStatusOrder } from '@prisma/client';
+import { Product, ProductVariant, TypeStatusOrder } from '@prisma/client';
 import { IOrderDeliveryService } from '../interfaces/order-delivery-service.interface';
 import { ISelectProductForCreateOrder } from '../interfaces/order.interface';
 import { GatewayService } from 'src/gateway/services/gateway.service';
@@ -125,6 +125,7 @@ export class OrderValidateRepository {
 
   validateTotalPayment(totalPayment: number, totalPaymentDto: number) {
     if (totalPayment !== totalPaymentDto) {
+      console.log(`expected: ${totalPayment}, actual: ${totalPaymentDto}`);
       throw new CustomError({
         message: 'Total pembayaran tidak valid',
         statusCode: 400,
@@ -148,5 +149,53 @@ export class OrderValidateRepository {
         statusCode: 400,
       });
     }
+  }
+
+  async validateProductsWithVariants(
+    carts: {
+      productUuid: string;
+      productVariantUuid: string;
+      quantity: number;
+    }[],
+    products: (Product & { productVariant: ProductVariant[] })[],
+  ) {
+    const validatedItems = [];
+
+    for (const cart of carts) {
+      const product = products.find((p) => p.uuid === cart.productUuid);
+
+      if (!product) {
+        throw new CustomError({
+          message: `Produk dengan UUID ${cart.productUuid} tidak ditemukan`,
+          statusCode: 404,
+        });
+      }
+
+      const variant = product.productVariant.find(
+        (v) => v.uuid === cart.productVariantUuid,
+      );
+
+      if (!variant) {
+        throw new CustomError({
+          message: `Varian produk tidak ditemukan untuk produk ${product.name}`,
+          statusCode: 404,
+        });
+      }
+
+      if (variant.stock < cart.quantity) {
+        throw new CustomError({
+          message: `Stok varian ${variant.name} tidak mencukupi`,
+          statusCode: 400,
+        });
+      }
+
+      validatedItems.push({
+        product,
+        variant,
+        quantity: cart.quantity,
+      });
+    }
+
+    return validatedItems;
   }
 }

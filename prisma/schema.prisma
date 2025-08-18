@@ -229,15 +229,15 @@ model ProductBundleItem {
 }
 
 model ProductVariant {
-  id            Int      @id @default(autoincrement())
-  uuid          String   @unique @default(uuid())
+  id            Int     @id @default(autoincrement())
+  uuid          String  @unique @default(uuid())
   productId     Int
   photoUrl      String?
   name          String
   code          String
   stock         Int
-  regularPrice  Decimal  @db.Decimal(10, 2)
-  salePrice     Decimal? @db.Decimal(10, 2)
+  regularPrice  Int
+  salePrice     Int?
   specification String?
 
   createdAt DateTime @default(now())
@@ -369,7 +369,8 @@ model OrderProduct {
 
   orderProductImage OrderProductImage[]
 
-  orderProductId Int
+  orderProductId        Int
+  orderProductVariantId Int
 
   order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderId Int
