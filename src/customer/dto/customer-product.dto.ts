@@ -12,6 +12,10 @@ export class CreateCustomerProductDto {
   @IsNotEmpty()
   productUuid: string;
 
+  @IsString()
+  @IsNotEmpty()
+  productVariantUuid: string;
+
   @IsNumber()
   @Min(1, { message: 'Quantity minimal 1' })
   @IsNotEmpty()

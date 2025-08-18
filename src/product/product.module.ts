@@ -10,6 +10,7 @@ import { CategoryProductRepository } from './repositories/category-product.repos
 import { ProductImageRepository } from './repositories/product-image.repository';
 import { CategoryProductService } from './services/category-product.service';
 import { ProductValidateRepository } from './repositories/product-validate.repository';
+import { ProductVariantRepository } from './repositories/product-variant.repository';
 
 @Module({
   imports: [
@@ -28,8 +29,9 @@ import { ProductValidateRepository } from './repositories/product-validate.repos
     ProductImageRepository,
     ProductService,
     CategoryProductService,
+    ProductVariantRepository,
   ],
   controllers: [ProductController],
-  exports: [ProductService, ProductRepository],
+  exports: [ProductService, ProductRepository, ProductVariantRepository],
 })
 export class ProductModule {}

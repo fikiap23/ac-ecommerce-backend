@@ -94,8 +94,8 @@ export class CustomerController {
   ) {
     const { sub } = await this.authService.decodeJwtToken(authorization);
     try {
-      await this.customerProductService.create(sub, dto);
-      return formatResponse(res, HttpStatus.CREATED, null);
+      const result = await this.customerProductService.create(sub, dto);
+      return formatResponse(res, HttpStatus.CREATED, result.uuid);
     } catch (error) {
       errorHandler(res, error);
     }
@@ -119,14 +119,28 @@ export class CustomerController {
 
   @UseGuards(JwtGuard, RoleGuard)
   @Roles(TypeRoleUser.CUSTOMER)
+  @Get('cart/:uuid')
+  async getCartByUuid(@Param('uuid') uuid: string, @Res() res: Response) {
+    try {
+      const result = await this.customerProductService.getThrowByUuid(uuid);
+      return formatResponse(res, HttpStatus.OK, result);
+    } catch (error) {
+      errorHandler(res, error);
+    }
+  }
+
+  @UseGuards(JwtGuard, RoleGuard)
+  @Roles(TypeRoleUser.CUSTOMER)
   @Put('cart/:uuid')
   async updateCart(
     @Param('uuid') uuid: string,
     @Body() dto: UpdateCustomerProductDto,
+    @Headers('authorization') authorization: string,
     @Res() res: Response,
   ) {
     try {
-      await this.customerProductService.updateByUuid(uuid, dto);
+      const { sub } = await this.authService.decodeJwtToken(authorization);
+      await this.customerProductService.updateByUuid(uuid, sub, dto);
       return formatResponse(res, HttpStatus.OK, null);
     } catch (error) {
       errorHandler(res, error);

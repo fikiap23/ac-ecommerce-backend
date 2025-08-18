@@ -16,6 +16,7 @@ import { OrderCallbackPaymentQuery } from './queries/order/order-callback-paymen
 import { OrderProductQuery } from './queries/order/order-product.query';
 import { CustomerProductQuery } from './queries/customer/customer-product.query';
 import { CustomerVoucherQuery } from './queries/customer/customer-voucher.query';
+import { ProductVariantQuery } from './queries/product/product-variant.query';
 
 @Module({
   imports: [],
@@ -37,6 +38,7 @@ import { CustomerVoucherQuery } from './queries/customer/customer-voucher.query'
     OrderProductQuery,
     CustomerProductQuery,
     CustomerVoucherQuery,
+    ProductVariantQuery,
   ],
   exports: [
     PrismaService,
@@ -56,6 +58,7 @@ import { CustomerVoucherQuery } from './queries/customer/customer-voucher.query'
     OrderProductQuery,
     CustomerProductQuery,
     CustomerVoucherQuery,
+    ProductVariantQuery,
   ],
 })
 export class PrismaModule {}

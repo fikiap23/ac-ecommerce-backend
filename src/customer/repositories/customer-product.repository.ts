@@ -101,4 +101,16 @@ export class CustomerProductRepository {
   }) {
     return await this.customerProductQuery.deleteMany({ tx, where });
   }
+
+  async findOne({
+    tx,
+    where,
+    select,
+  }: {
+    tx?: Prisma.TransactionClient;
+    where?: Prisma.CustomerProductWhereInput;
+    select?: Prisma.CustomerProductSelect;
+  }) {
+    return await this.customerProductQuery.findOne({ tx, where, select });
+  }
 }

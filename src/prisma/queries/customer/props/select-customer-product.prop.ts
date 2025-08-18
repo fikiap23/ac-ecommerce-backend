@@ -22,12 +22,15 @@ export const selectCustomerProduct: Prisma.CustomerProductSelect = {
           url: true,
         },
       },
+
+      productVariant: true,
     },
   },
 };
 
 export const selectCustomerProductForUpdate: Prisma.CustomerProductSelect = {
   productId: true,
+  productVariantId: true,
   product: {
     select: {
       id: true,

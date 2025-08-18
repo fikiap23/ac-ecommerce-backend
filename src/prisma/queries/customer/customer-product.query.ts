@@ -81,4 +81,17 @@ export class CustomerProductQuery extends PrismaService {
     const prisma = tx ?? this;
     return await prisma.customerProduct.deleteMany({ where });
   }
+
+  async findOne({
+    tx,
+    where,
+    select,
+  }: {
+    tx?: Prisma.TransactionClient;
+    where?: Prisma.CustomerProductWhereInput;
+    select?: Prisma.CustomerProductSelect;
+  }) {
+    const prisma = tx ?? this;
+    return await prisma.customerProduct.findFirst({ where, select });
+  }
 }

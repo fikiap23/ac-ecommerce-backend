@@ -12,6 +12,8 @@ import {
   selectCustomerProduct,
   selectCustomerProductForUpdate,
 } from 'src/prisma/queries/customer/props/select-customer-product.prop';
+import { ProductVariantRepository } from 'src/product/repositories/product-variant.repository';
+import { ProductVariant } from '@prisma/client';
 
 @Injectable()
 export class CustomerProductService {
@@ -19,27 +21,36 @@ export class CustomerProductService {
     private readonly customerProductRepository: CustomerProductRepository,
     private readonly customerRepository: CustomerRepository,
     private readonly productRepository: ProductRepository,
+    private readonly productVariantRepository: ProductVariantRepository,
   ) {}
 
   async create(sub: string, dto: CreateCustomerProductDto) {
     const customer = await this.customerRepository.getThrowByUuid({
       uuid: sub,
     });
+
     const product = await this.productRepository.getThrowByUuid({
       uuid: dto.productUuid,
       select: selectProductForCreateCustomerProduct,
     });
 
-    if (product && product.stock < dto.quantity) {
+    const productVariant = await this.productVariantRepository.getThrowByUuid({
+      uuid: dto.productVariantUuid,
+    });
+
+    if (Number(productVariant.stock) < dto.quantity) {
       throw new CustomError({
         message: 'Stok tidak mencukupi',
         statusCode: 400,
       });
     }
+
+    // Cek apakah sudah ada di keranjang
     const isInCart = await this.customerProductRepository.getMany({
       where: {
         customerId: customer.id,
         productId: product.id,
+        productVariantId: productVariant.id,
       },
     });
 
@@ -50,18 +61,18 @@ export class CustomerProductService {
       });
     }
 
+    // Insert ke keranjang
     return await this.customerProductRepository.create({
       data: {
         customer: {
-          connect: {
-            id: customer.id,
-          },
+          connect: { id: customer.id },
         },
         quantity: dto.quantity,
         product: {
-          connect: {
-            id: product.id,
-          },
+          connect: { id: product.id },
+        },
+        productVariant: {
+          connect: { id: productVariant.id },
         },
       },
     });
@@ -81,20 +92,32 @@ export class CustomerProductService {
     });
   }
 
-  async updateByUuid(uuid: string, dto: UpdateCustomerProductDto) {
-    const customerProduct = await this.customerProductRepository.getThrowByUuid(
-      {
+  async updateByUuid(uuid: string, sub: string, dto: UpdateCustomerProductDto) {
+    const customerProduct = await this.customerProductRepository.findOne({
+      where: {
         uuid,
-        select: selectCustomerProductForUpdate,
+        customer: {
+          uuid: sub,
+        },
       },
-    );
-    if (customerProduct.productId) {
-      if (customerProduct.product.stock < dto.quantity) {
-        throw new CustomError({
-          message: 'Stok tidak mencukupi',
-          statusCode: 400,
-        });
-      }
+      select: selectCustomerProductForUpdate,
+    });
+    if (!customerProduct.productVariantId) {
+      throw new CustomError({
+        message: 'Produk tidak memiliki variant yang valid',
+        statusCode: 400,
+      });
+    }
+
+    const productVariant = await this.productVariantRepository.getThrowById({
+      id: customerProduct.productVariantId,
+    });
+
+    if (Number(productVariant.stock) < dto.quantity) {
+      throw new CustomError({
+        message: 'Stok tidak mencukupi',
+        statusCode: 400,
+      });
     }
 
     return await this.customerProductRepository.updateByUuid({
@@ -108,5 +131,12 @@ export class CustomerProductService {
   async deleteByUuid(uuid: string) {
     await this.customerProductRepository.getThrowByUuid({ uuid });
     return await this.customerProductRepository.deleteByUuid({ uuid });
+  }
+
+  async getThrowByUuid(uuid: string) {
+    return await this.customerProductRepository.getThrowByUuid({
+      uuid,
+      select: selectCustomerProduct,
+    });
   }
 }

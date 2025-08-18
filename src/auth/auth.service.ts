@@ -40,7 +40,7 @@ export class AuthService {
       customer = existingCustomer;
     }
 
-    return await this.signJwtTokenCustomer(customer.uuid);
+    return await this.signJwtTokenCustomer(customer.id, customer.uuid);
   }
 
   async signinAdmin(dto: SigninAdminDto) {
@@ -63,10 +63,12 @@ export class AuthService {
   }
 
   private async signJwtTokenCustomer(
-    idUser: string,
+    idUser: number,
+    uuid: string,
   ): Promise<{ access_token: string }> {
     const payload = {
-      sub: idUser,
+      sub: uuid,
+      id: idUser,
       role: 'CUSTOMER',
     };
 
