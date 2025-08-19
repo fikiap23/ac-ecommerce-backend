@@ -195,8 +195,8 @@ model Product {
   updatedAt   DateTime           @updatedAt
   deletedAt   DateTime?
 
-  categoryProductId Int
-  categoryProduct   CategoryProduct @relation(fields: [categoryProductId], references: [id], onDelete: Cascade)
+  categoryProductId Int?
+  categoryProduct   CategoryProduct? @relation(fields: [categoryProductId], references: [id], onDelete: Cascade)
 
   productBundleItems ProductBundleItem[]
   customerProduct    CustomerProduct[]
@@ -210,11 +210,24 @@ model Bundle {
   name        String
   description String    @db.Text
   minusPrice  Int?
+  isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  items ProductBundleItem[]
+  items       ProductBundleItem[]
+  bundleImage BundleImage[]
+}
+
+model BundleImage {
+  id        Int      @id @default(autoincrement())
+  uuid      String   @unique @default(uuid())
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bundle    Bundle @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId Int
 }
 
 model ProductBundleItem {

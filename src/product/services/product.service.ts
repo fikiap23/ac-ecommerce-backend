@@ -9,6 +9,8 @@ import { CategoryProductRepository } from '../repositories/category-product.repo
 import { Prisma } from '@prisma/client';
 import { selectGeneralProduct } from 'src/prisma/queries/product/props/select-product.prop';
 import { ProductValidateRepository } from '../repositories/product-validate.repository';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { CustomError } from 'helpers/http.helper';
 
 @Injectable()
 export class ProductService {
@@ -16,78 +18,153 @@ export class ProductService {
     private readonly categoryProductRepository: CategoryProductRepository,
     private readonly productRepository: ProductRepository,
     private readonly productValidateRepository: ProductValidateRepository,
+    private readonly prisma: PrismaService,
   ) {}
 
-  async create(dto: CreateProductDto) {
-    const { categoryProductUuid, productImages, variants, ...cleanDto } = dto;
+  async create(dto: CreateProductDto, files?: Express.Multer.File[]) {
+    const { packageType, serviceType, variants, bundlingItems } = dto;
 
-    //Validate product images
-    this.productValidateRepository.validateProductImages(productImages);
-
-    //  Find category
-    const categoryProduct = await this.categoryProductRepository.getThrowByUuid(
-      {
-        uuid: dto.categoryProductUuid,
-      },
-    );
-
-    //  Upload product images
-    const productImageUrls =
-      await this.productRepository.uploadBulkProductImages(productImages);
-
-    //  Variants
-    const variantData: Prisma.ProductVariantCreateWithoutProductInput[] =
-      variants?.length
-        ? await Promise.all(
-            variants.map(
-              async (
-                variant,
-              ): Promise<Prisma.ProductVariantCreateWithoutProductInput> => {
-                let photoUrl: string | undefined;
-
-                // Upload variant images
-                if (variant.image?.length) {
-                  const [uploaded] =
-                    await this.productRepository.uploadBulkProductImages([
-                      variant.image[0],
-                    ]);
-                  photoUrl = uploaded.url;
-                }
-
-                return {
-                  name: variant.name,
-                  code: variant.code,
-                  stock: variant.stock,
-                  regularPrice: variant.regularPrice,
-                  salePrice: variant.salePrice,
-                  specification: variant.specification,
-                  photoUrl,
-                };
+    switch (packageType) {
+      case 'SINGLE': {
+        if (dto.serviceType === 'SERVICE') {
+          // === CREATE SINGLE SERVICE ===
+          const service = await this.prisma.product.create({
+            data: {
+              name: dto.name,
+              description: dto.description,
+              price: dto.price,
+              salePrice: dto.salePrice ?? null,
+              packageType,
+              serviceType,
+              categoryProduct: {
+                connect: { uuid: dto.categoryProductUuid },
               },
-            ),
-          )
-        : [];
+              isActive: dto.isActive ?? true,
+              type: null,
+              // TODO Upload images
+              productImage: files?.length
+                ? {
+                    createMany: {
+                      data: files.map((f) => ({
+                        url: `/uploads/${f.filename}`,
+                      })),
+                    },
+                  }
+                : undefined,
+            },
+          });
 
-    //  Create product with nested images & variants
-    return await this.productRepository.create({
-      data: {
-        ...cleanDto,
-        isActive: dto.isActive ?? true,
-        categoryProduct: {
-          connect: { id: categoryProduct.id },
-        },
-        productImage: {
-          createMany: {
-            data: productImageUrls,
+          return service;
+        }
+
+        // === CREATE SINGLE PRODUCT ===
+        const product = await this.prisma.product.create({
+          data: {
+            name: dto.name,
+            description: dto.description,
+            price: dto.price,
+            salePrice: dto.salePrice ?? null,
+            packageType,
+            serviceType,
+            categoryProduct: {
+              connect: { uuid: dto.categoryProductUuid },
+            },
+            isActive: dto.isActive ?? true,
+            // TODO Upload images
+            productImage: files?.length
+              ? {
+                  createMany: {
+                    data: files.map((f) => ({
+                      url: `/uploads/${f.filename}`,
+                    })),
+                  },
+                }
+              : undefined,
+            productVariant: variants?.length
+              ? {
+                  createMany: {
+                    data: variants.map((v) => ({
+                      name: v.name,
+                      code: v.code,
+                      stock: v.stock,
+                      regularPrice: v.regularPrice,
+                      salePrice: v.salePrice ?? null,
+                      specification: v.specification ?? null,
+                    })),
+                  },
+                }
+              : undefined,
           },
-        },
-        ...(variantData.length && {
-          productVariant: {
-            create: variantData,
+        });
+
+        return product;
+      }
+
+      case 'BUNDLE': {
+        if (!bundlingItems?.length) {
+          throw new CustomError({
+            message: 'Bundling item wajib diisi',
+            statusCode: 400,
+          });
+        }
+
+        // === CREATE BUNDLE  ===
+        const bundle = await this.prisma.bundle.create({
+          data: {
+            name: dto.name,
+            description: dto.description,
+            minusPrice: dto.bundlingMinusPrice ?? null,
+            isActive: dto.isActive,
+            // TODO Upload images
+            bundleImage: files?.length
+              ? {
+                  createMany: {
+                    data: files.map((f) => ({
+                      url: `/uploads/${f.filename}`,
+                    })),
+                  },
+                }
+              : undefined,
           },
-        }),
-      },
-    });
+        });
+
+        // get products
+        const products = await this.prisma.product.findMany({
+          where: {
+            uuid: { in: bundlingItems.map((i) => i.productUuid) },
+          },
+          select: { id: true, uuid: true },
+        });
+
+        const productMap = new Map(products.map((p) => [p.uuid, p.id]));
+
+        // === CONNECT ITEMS to BUNDLE ===
+        await this.prisma.productBundleItem.createMany({
+          data: bundlingItems.map((item) => {
+            const productId = productMap.get(item.productUuid);
+            if (!productId) {
+              throw new CustomError({
+                message: `Produk dengan uuid ${item.productUuid} tidak ditemukan`,
+                statusCode: 404,
+              });
+            }
+            return {
+              bundleId: bundle.id,
+              productId,
+            };
+          }),
+        });
+
+        return bundle;
+      }
+
+      default: {
+        throw new CustomError({
+          message: `Package type ${packageType} tidak dikenal`,
+          statusCode: 400,
+        });
+      }
+    }
   }
 
   async getAll(filter: IFilterProduct) {

@@ -17,10 +17,7 @@ import { ProductService } from './services/product.service';
 import { JwtGuard, RoleGuard } from 'src/auth/guard';
 import { Roles } from 'src/auth/decorator';
 import { TypeRoleAdmin } from '@prisma/client';
-import {
-  AnyFilesInterceptor,
-  FileFieldsInterceptor,
-} from '@nestjs/platform-express';
+import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import {
   CreateProductDto,
   QueryProductDto,
@@ -83,7 +80,7 @@ export class ProductController {
       }
 
       const result = await this.productService.create(dto);
-      return formatResponse(res, HttpStatus.CREATED, result.uuid);
+      return formatResponse(res, HttpStatus.CREATED, result);
     } catch (error) {
       errorHandler(res, error);
     }

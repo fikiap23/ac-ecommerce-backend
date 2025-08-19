@@ -1,4 +1,6 @@
 import {
+  ArrayMinSize,
+  ArrayNotEmpty,
   IsArray,
   IsBoolean,
   IsEnum,
@@ -7,6 +9,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
@@ -47,34 +50,43 @@ export class CreateProductVariantDto {
   image?: Express.Multer.File[];
 }
 
+export class BundlingItemDto {
+  @IsString()
+  @IsNotEmpty()
+  productUuid: string;
+}
+
 export class CreateProductDto {
+  @IsEnum(TypeProductPackage)
+  @IsNotEmpty()
+  packageType?: TypeProductPackage;
+
+  @ValidateIf((o) => o.packageType === TypeProductPackage.SINGLE)
+  @IsEnum(TypeProductService)
+  @IsNotEmpty()
+  serviceType?: TypeProductService;
+
   @IsString()
   @IsNotEmpty()
   name: string;
 
+  @ValidateIf((o) => o.packageType !== TypeProductPackage.BUNDLE)
   @IsString()
   @IsNotEmpty()
   categoryProductUuid: string;
 
+  @ValidateIf((o) => o.serviceType === TypeProductService.PRODUCT)
   @IsString()
-  @IsOptional()
+  @IsNotEmpty()
   brand?: string;
 
   @IsString()
   @IsNotEmpty()
   description: string;
 
-  @IsEnum(TypeProductPackage)
-  @IsOptional()
-  packageType?: TypeProductPackage = TypeProductPackage.SINGLE;
-
-  @IsEnum(TypeProductService)
-  @IsOptional()
-  serviceType?: TypeProductService = TypeProductService.PRODUCT;
-
   @IsEnum(TypeProduct)
   @IsOptional()
-  type?: TypeProduct = TypeProduct.INVERTER;
+  type?: TypeProduct;
 
   @IsString()
   @IsOptional()
@@ -94,19 +106,27 @@ export class CreateProductDto {
 
   @IsBoolean()
   @IsOptional()
-  isActive?: boolean = true;
+  isActive?: boolean;
 
-  @IsOptional()
-  @IsInt()
-  stock: number;
-
-  @IsOptional()
+  @ValidateIf((o) => o.serviceType === TypeProductService.PRODUCT)
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => CreateProductVariantDto)
   variants: CreateProductVariantDto[];
 
   productImages?: Express.Multer.File[];
+
+  @ValidateIf((o) => o.packageType === TypeProductPackage.BUNDLE)
+  @ArrayNotEmpty()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BundlingItemDto)
+  bundlingItems: BundlingItemDto[];
+
+  @ValidateIf((o) => o.packageType === TypeProductPackage.BUNDLE)
+  @IsNumber()
+  bundlingMinusPrice: number;
 }
 
 export class ProductImageData {
