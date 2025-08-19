@@ -207,9 +207,12 @@ model Product {
 
 model Bundle {
   id          Int       @id @default(autoincrement())
+  uuid        String    @unique @default(uuid())
   name        String
   description String    @db.Text
   minusPrice  Int?
+  price       Int
+  salePrice   Int?
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

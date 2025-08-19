@@ -96,6 +96,7 @@ export class CreateProductDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   capacity?: number;
 
+  @ValidateIf((o) => o.packageType !== TypeProductPackage.BUNDLE)
   @IsNumber()
   @IsNotEmpty()
   price: number;

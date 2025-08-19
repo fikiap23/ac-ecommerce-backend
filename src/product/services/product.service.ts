@@ -108,14 +108,33 @@ export class ProductService {
           });
         }
 
-        // === CREATE BUNDLE  ===
+        // === Ambil produk yang ada ===
+        const products = await this.prisma.product.findMany({
+          where: {
+            uuid: { in: bundlingItems.map((i) => i.productUuid) },
+          },
+          select: { id: true, uuid: true, price: true },
+        });
+
+        if (products.length !== bundlingItems.length) {
+          throw new CustomError({
+            message: 'Salah satu produk tidak ditemukan',
+            statusCode: 404,
+          });
+        }
+
+        // === Hitung total harga bundle ===
+        const totalProductPrice = products.reduce((sum, p) => sum + p.price, 0);
+        const finalPrice = totalProductPrice - (dto.bundlingMinusPrice ?? 0);
+
+        // === CREATE BUNDLE SEKALIGUS DENGAN ITEMS ===
         const bundle = await this.prisma.bundle.create({
           data: {
             name: dto.name,
             description: dto.description,
             minusPrice: dto.bundlingMinusPrice ?? null,
             isActive: dto.isActive,
-            // TODO Upload images
+            price: finalPrice,
             bundleImage: files?.length
               ? {
                   createMany: {
@@ -125,34 +144,21 @@ export class ProductService {
                   },
                 }
               : undefined,
+            items: {
+              createMany: {
+                data: products.map((p) => ({
+                  productId: p.id,
+                })),
+              },
+            },
           },
-        });
-
-        // get products
-        const products = await this.prisma.product.findMany({
-          where: {
-            uuid: { in: bundlingItems.map((i) => i.productUuid) },
+          include: {
+            items: {
+              include: {
+                product: { select: { uuid: true, name: true, price: true } },
+              },
+            },
           },
-          select: { id: true, uuid: true },
-        });
-
-        const productMap = new Map(products.map((p) => [p.uuid, p.id]));
-
-        // === CONNECT ITEMS to BUNDLE ===
-        await this.prisma.productBundleItem.createMany({
-          data: bundlingItems.map((item) => {
-            const productId = productMap.get(item.productUuid);
-            if (!productId) {
-              throw new CustomError({
-                message: `Produk dengan uuid ${item.productUuid} tidak ditemukan`,
-                statusCode: 404,
-              });
-            }
-            return {
-              bundleId: bundle.id,
-              productId,
-            };
-          }),
         });
 
         return bundle;

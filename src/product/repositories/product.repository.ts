@@ -112,7 +112,7 @@ export class ProductRepository {
       AND: [where, additionWhere].filter(Boolean),
     };
 
-    return await this.productQuery.findManyPaginate({
+    return await this.productQuery.findManyPaginateAll({
       tx,
       where: combinedWhere,
       select,

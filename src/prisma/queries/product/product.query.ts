@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { IPaginatedResult } from 'src/prisma/interfaces/paginated-result.interface';
 import { PaginateFunction, paginator } from 'src/prisma/paginator/paginator';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
@@ -41,13 +42,13 @@ export class ProductQuery extends PrismaService {
     });
   }
 
-  async findManyPaginate({
+  async findManyPaginateAll({
     tx,
     where,
     select,
     orderBy,
-    page,
-    limit,
+    page = 1,
+    limit = 10,
   }: {
     tx?: Prisma.TransactionClient;
     where?: Prisma.ProductWhereInput;
@@ -55,20 +56,74 @@ export class ProductQuery extends PrismaService {
     orderBy?: Prisma.ProductOrderByWithRelationInput;
     page?: number;
     limit?: number;
-  }) {
+  }): Promise<IPaginatedResult<any>> {
     const prisma = tx ?? this;
-    return paginate(
-      prisma.product,
-      {
-        where: {
-          ...where,
-          deletedAt: null,
-        },
+
+    //count total product + bundle
+    const [countProducts, countBundles] = await Promise.all([
+      prisma.product.count({
+        where: { ...where, deletedAt: null },
+      }),
+      prisma.bundle.count({
+        where: { deletedAt: null },
+      }),
+    ]);
+
+    const total = countProducts + countBundles;
+    const lastPage = Math.ceil(total / limit);
+    const skip = (page - 1) * limit;
+
+    // get product + bundle
+    const [products, bundles] = await Promise.all([
+      prisma.product.findMany({
+        where: { ...where, deletedAt: null },
         select,
         orderBy,
+      }),
+      prisma.bundle.findMany({
+        where: { deletedAt: null },
+        select: {
+          uuid: true,
+          name: true,
+          description: true,
+          price: true,
+          isActive: true,
+          createdAt: true,
+          items: {
+            select: {
+              product: { select: { uuid: true, name: true, price: true } },
+            },
+          },
+        },
+        orderBy,
+      }),
+    ]);
+
+    // combine product + bundle
+    const combinedData = [
+      ...products.map((p) => ({ ...p, recordType: 'PRODUCT' })),
+      ...bundles.map((b) => ({ ...b, recordType: 'BUNDLE' })),
+    ];
+
+    // optional: sort global (kalau ada field createdAt / name)
+    combinedData.sort((a, b) => {
+      return a.createdAt > b.createdAt ? -1 : 1;
+    });
+
+    // pagination
+    const paginatedData = combinedData.slice(skip, skip + limit);
+
+    return {
+      data: paginatedData,
+      meta: {
+        total,
+        lastPage,
+        currentPage: page,
+        perPage: limit,
+        prev: page > 1 ? page - 1 : null,
+        next: page < lastPage ? page + 1 : null,
       },
-      { page, perPage: limit },
-    );
+    };
   }
 
   async findByUnique({
