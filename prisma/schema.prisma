@@ -185,9 +185,6 @@ model Product {
   name        String
   brand       String?
   description String             @db.Text
-  type        TypeProduct?       @default(INVERTER)
-  model       String?
-  capacity    Decimal?           @db.Decimal(10, 2)
   price       Int
   salePrice   Int?
   isActive    Boolean            @default(true)
@@ -195,6 +192,12 @@ model Product {
   updatedAt   DateTime           @updatedAt
   deletedAt   DateTime?
 
+  typeId            Int?
+  type              Type?            @relation(fields: [typeId], references: [id], onDelete: Cascade)
+  modelId           Int?
+  model             Model?           @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  capacityId        Int?
+  capacity          Capacity?        @relation(fields: [capacityId], references: [id], onDelete: Cascade)
   categoryProductId Int?
   categoryProduct   CategoryProduct? @relation(fields: [categoryProductId], references: [id], onDelete: Cascade)
 
@@ -206,27 +209,30 @@ model Product {
 }
 
 model Type {
-  id        Int      @id @default(autoincrement())
-  uuid      String   @unique @default(uuid())
+  id        Int       @id @default(autoincrement())
+  uuid      String    @unique @default(uuid())
   name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  product   Product[]
 }
 
 model Model {
-  id        Int      @id @default(autoincrement())
-  uuid      String   @unique @default(uuid())
+  id        Int       @id @default(autoincrement())
+  uuid      String    @unique @default(uuid())
   name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  product   Product[]
 }
 
 model Capacity {
-  id        Int      @id @default(autoincrement())
-  uuid      String   @unique @default(uuid())
+  id        Int       @id @default(autoincrement())
+  uuid      String    @unique @default(uuid())
   name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  product   Product[]
 }
 
 model Bundle {
@@ -396,9 +402,9 @@ model OrderProduct {
   name        String
   brand       String?
   description String              @db.Text
-  type        TypeProduct?        @default(INVERTER)
+  type        String
   model       String?
-  capacity    Decimal?            @db.Decimal(3, 2)
+  capacity    String?
   price       Int
   category    String
   quantity    Int

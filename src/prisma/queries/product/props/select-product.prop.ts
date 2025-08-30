@@ -38,6 +38,9 @@ export const selectProductForCreateOrder: Prisma.ProductSelect = {
   productImage: true,
   productVoucer: true,
   productVariant: true,
+  model: true,
+  capacity: true,
+  type: true,
 };
 
 export const selectProductForCreateCustomerProduct: Prisma.ProductSelect = {

@@ -15,11 +15,7 @@ import {
 import { Transform, Type } from 'class-transformer';
 import { PartialType } from '@nestjs/mapped-types';
 import { SearchPaginationDto } from 'utils/dto/pagination.dto';
-import {
-  TypeProduct,
-  TypeProductPackage,
-  TypeProductService,
-} from '@prisma/client';
+import { TypeProductPackage, TypeProductService } from '@prisma/client';
 
 export class CreateProductVariantDto {
   @IsOptional()
@@ -84,17 +80,17 @@ export class CreateProductDto {
   @IsNotEmpty()
   description: string;
 
-  @IsEnum(TypeProduct)
+  @IsString()
   @IsOptional()
-  type?: TypeProduct;
+  typeUuid?: string;
 
   @IsString()
   @IsOptional()
-  model?: string;
+  modelUuid?: string;
 
+  @IsString()
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 })
-  capacity?: number;
+  capacityUuid?: string;
 
   @ValidateIf((o) => o.packageType !== TypeProductPackage.BUNDLE)
   @IsNumber()

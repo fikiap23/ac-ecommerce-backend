@@ -8,27 +8,78 @@ import {
 import { CategoryProductRepository } from '../repositories/category-product.repository';
 import { Prisma } from '@prisma/client';
 import { selectGeneralProduct } from 'src/prisma/queries/product/props/select-product.prop';
-import { ProductValidateRepository } from '../repositories/product-validate.repository';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CustomError } from 'helpers/http.helper';
+import { ModelRepository } from '../repositories/model.repository';
+import { CapacityRepository } from '../repositories/capacity.repository';
+import { TypeRepository } from '../repositories/type.repository';
 
 @Injectable()
 export class ProductService {
   constructor(
     private readonly categoryProductRepository: CategoryProductRepository,
     private readonly productRepository: ProductRepository,
-    private readonly productValidateRepository: ProductValidateRepository,
     private readonly prisma: PrismaService,
+    private readonly modelRepository: ModelRepository,
+    private readonly capacityRepository: CapacityRepository,
+    private readonly typeRepository: TypeRepository,
   ) {}
 
   async create(dto: CreateProductDto, files?: Express.Multer.File[]) {
-    const { packageType, serviceType, variants, bundlingItems } = dto;
+    const {
+      packageType,
+      serviceType,
+      variants,
+      bundlingItems,
+      typeUuid,
+      modelUuid,
+      capacityUuid,
+    } = dto;
 
+    // === VALIDASI TYPE, MODEL, CAPACITY ===
+    let typeConnect = undefined;
+    let modelConnect = undefined;
+    let capacityConnect = undefined;
+    let categoryProductConnect = undefined;
+
+    if (typeUuid) {
+      await this.typeRepository.getThrowByUuid({
+        uuid: typeUuid,
+      });
+
+      typeConnect = { connect: { uuid: typeUuid } };
+    }
+
+    if (modelUuid) {
+      await this.modelRepository.getThrowByUuid({
+        uuid: modelUuid,
+      });
+
+      modelConnect = { connect: { uuid: modelUuid } };
+    }
+
+    if (capacityUuid) {
+      await this.capacityRepository.getThrowByUuid({
+        uuid: capacityUuid,
+      });
+
+      capacityConnect = { connect: { uuid: capacityUuid } };
+    }
+
+    // === VALIDASI CATEGORY PRODUCT ===
+
+    if (dto.categoryProductUuid) {
+      await this.categoryProductRepository.getThrowByUuid({
+        uuid: dto.categoryProductUuid,
+      });
+      categoryProductConnect = { connect: { uuid: dto.categoryProductUuid } };
+    }
+
+    // === CREATE PRODUCT / SERVICE / BUNDLE ===
     switch (packageType) {
-      case 'SINGLE': {
-        if (dto.serviceType === 'SERVICE') {
-          // === CREATE SINGLE SERVICE ===
-          const service = await this.prisma.product.create({
+      case 'SINGLE':
+        if (serviceType === 'SERVICE') {
+          return await this.prisma.product.create({
             data: {
               name: dto.name,
               description: dto.description,
@@ -36,12 +87,11 @@ export class ProductService {
               salePrice: dto.salePrice ?? null,
               packageType,
               serviceType,
-              categoryProduct: {
-                connect: { uuid: dto.categoryProductUuid },
-              },
               isActive: dto.isActive ?? true,
-              type: null,
-              // TODO Upload images
+              type: typeConnect,
+              model: modelConnect,
+              capacity: capacityConnect,
+              categoryProduct: categoryProductConnect,
               productImage: files?.length
                 ? {
                     createMany: {
@@ -53,12 +103,10 @@ export class ProductService {
                 : undefined,
             },
           });
-
-          return service;
         }
 
-        // === CREATE SINGLE PRODUCT ===
-        const product = await this.prisma.product.create({
+        // SINGLE PRODUCT
+        return await this.prisma.product.create({
           data: {
             name: dto.name,
             description: dto.description,
@@ -66,17 +114,15 @@ export class ProductService {
             salePrice: dto.salePrice ?? null,
             packageType,
             serviceType,
-            categoryProduct: {
-              connect: { uuid: dto.categoryProductUuid },
-            },
             isActive: dto.isActive ?? true,
-            // TODO Upload images
+            type: typeConnect,
+            model: modelConnect,
+            capacity: capacityConnect,
+            categoryProduct: categoryProductConnect,
             productImage: files?.length
               ? {
                   createMany: {
-                    data: files.map((f) => ({
-                      url: `/uploads/${f.filename}`,
-                    })),
+                    data: files.map((f) => ({ url: `/uploads/${f.filename}` })),
                   },
                 }
               : undefined,
@@ -96,9 +142,6 @@ export class ProductService {
               : undefined,
           },
         });
-
-        return product;
-      }
 
       case 'BUNDLE': {
         if (!bundlingItems?.length) {
@@ -164,12 +207,11 @@ export class ProductService {
         return bundle;
       }
 
-      default: {
+      default:
         throw new CustomError({
           message: `Package type ${packageType} tidak dikenal`,
           statusCode: 400,
         });
-      }
     }
   }
 
