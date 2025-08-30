@@ -13,7 +13,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { ProductService } from './services/product.service';
+import { ProductService } from '../services/product.service';
 import { JwtGuard, RoleGuard } from 'src/auth/guard';
 import { Roles } from 'src/auth/decorator';
 import { TypeRoleAdmin } from '@prisma/client';
@@ -22,7 +22,7 @@ import {
   CreateProductDto,
   QueryProductDto,
   UpdateProductDto,
-} from './dto/product.dto';
+} from '../dto/product.dto';
 import { formatResponse } from 'helpers/http.helper';
 import { errorHandler, imageFileFilter } from 'helpers/validation.helper';
 import { Response } from 'express';
@@ -30,8 +30,8 @@ import {
   CreateCategoryProductDto,
   QueryCategoryProductDto,
   UpdateCategoryProductDto,
-} from './dto/category-product.dto';
-import { CategoryProductService } from './services/category-product.service';
+} from '../dto/category-product.dto';
+import { CategoryProductService } from '../services/category-product.service';
 
 @Controller()
 export class ProductController {

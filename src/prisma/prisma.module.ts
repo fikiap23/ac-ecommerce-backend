@@ -17,6 +17,11 @@ import { OrderProductQuery } from './queries/order/order-product.query';
 import { CustomerProductQuery } from './queries/customer/customer-product.query';
 import { CustomerVoucherQuery } from './queries/customer/customer-voucher.query';
 import { ProductVariantQuery } from './queries/product/product-variant.query';
+import { ModelQuery } from './queries/model/model.query';
+import { TypeQuery } from './queries/type/type.query';
+import { CapacityQuery } from './queries/capacity/capacity.query';
+import { TechnicianQuery } from './queries/technician/technician.query';
+import { DriverQuery } from './queries/driver/driver.query';
 
 @Module({
   imports: [],
@@ -39,6 +44,11 @@ import { ProductVariantQuery } from './queries/product/product-variant.query';
     CustomerProductQuery,
     CustomerVoucherQuery,
     ProductVariantQuery,
+    ModelQuery,
+    TypeQuery,
+    CapacityQuery,
+    TechnicianQuery,
+    DriverQuery,
   ],
   exports: [
     PrismaService,
@@ -59,6 +69,11 @@ import { ProductVariantQuery } from './queries/product/product-variant.query';
     CustomerProductQuery,
     CustomerVoucherQuery,
     ProductVariantQuery,
+    ModelQuery,
+    TypeQuery,
+    CapacityQuery,
+    TechnicianQuery,
+    DriverQuery,
   ],
 })
 export class PrismaModule {}
