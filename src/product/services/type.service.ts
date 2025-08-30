@@ -5,11 +5,11 @@ import { CreateTypeDto, UpdateTypeDto } from '../dto/type.dto';
 
 @Injectable()
 export class TypeService {
-  constructor(private readonly categoryProductRepository: TypeRepository) {}
+  constructor(private readonly typeRepository: TypeRepository) {}
 
   async create(dto: CreateTypeDto) {
     const { ...cleanDto } = dto;
-    return await this.categoryProductRepository.create({
+    return await this.typeRepository.create({
       data: {
         ...cleanDto,
       },
@@ -17,22 +17,22 @@ export class TypeService {
   }
 
   async getAll() {
-    return await this.categoryProductRepository.getMany({});
+    return await this.typeRepository.getMany({});
   }
 
   async getByUuid(uuid: string) {
-    return await this.categoryProductRepository.getThrowByUuid({
+    return await this.typeRepository.getThrowByUuid({
       uuid,
     });
   }
 
   async updateByUuid(uuid: string, dto: UpdateTypeDto) {
-    const type = await this.categoryProductRepository.getThrowByUuid({
+    const type = await this.typeRepository.getThrowByUuid({
       uuid,
     });
 
     const { ...cleanDto } = dto;
-    return await this.categoryProductRepository.updateById({
+    return await this.typeRepository.updateById({
       id: type.id,
       data: {
         ...cleanDto,
@@ -41,9 +41,9 @@ export class TypeService {
   }
 
   async deleteByUuid(uuid: string) {
-    const type = await this.categoryProductRepository.getThrowByUuid({
+    const type = await this.typeRepository.getThrowByUuid({
       uuid,
     });
-    return await this.categoryProductRepository.deleteById({ id: type.id });
+    return await this.typeRepository.deleteById({ id: type.id });
   }
 }

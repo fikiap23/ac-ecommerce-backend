@@ -5,11 +5,11 @@ import { CreateModelDto, UpdateModelDto } from '../dto/model.dto';
 
 @Injectable()
 export class ModelService {
-  constructor(private readonly categoryProductRepository: ModelRepository) {}
+  constructor(private readonly modelRepository: ModelRepository) {}
 
   async create(dto: CreateModelDto) {
     const { ...cleanDto } = dto;
-    return await this.categoryProductRepository.create({
+    return await this.modelRepository.create({
       data: {
         ...cleanDto,
       },
@@ -17,22 +17,22 @@ export class ModelService {
   }
 
   async getAll() {
-    return await this.categoryProductRepository.getMany({});
+    return await this.modelRepository.getMany({});
   }
 
   async getByUuid(uuid: string) {
-    return await this.categoryProductRepository.getThrowByUuid({
+    return await this.modelRepository.getThrowByUuid({
       uuid,
     });
   }
 
   async updateByUuid(uuid: string, dto: UpdateModelDto) {
-    const model = await this.categoryProductRepository.getThrowByUuid({
+    const model = await this.modelRepository.getThrowByUuid({
       uuid,
     });
 
     const { ...cleanDto } = dto;
-    return await this.categoryProductRepository.updateById({
+    return await this.modelRepository.updateById({
       id: model.id,
       data: {
         ...cleanDto,
@@ -41,9 +41,9 @@ export class ModelService {
   }
 
   async deleteByUuid(uuid: string) {
-    const model = await this.categoryProductRepository.getThrowByUuid({
+    const model = await this.modelRepository.getThrowByUuid({
       uuid,
     });
-    return await this.categoryProductRepository.deleteById({ id: model.id });
+    return await this.modelRepository.deleteById({ id: model.id });
   }
 }

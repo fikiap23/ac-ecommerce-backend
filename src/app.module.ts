@@ -13,6 +13,8 @@ import { UserManagementModule } from './user-management/user-management.module';
 import { VoucherModule } from './voucher/voucher.module';
 import { OrderModule } from './order/order.module';
 import { MailModule } from './mail/mail.module';
+import { DriverModule } from './driver/driver.module';
+import { TechnicianModule } from './technician/technician.module';
 
 @Module({
   imports: [
@@ -33,6 +35,8 @@ import { MailModule } from './mail/mail.module';
     VoucherModule,
     OrderModule,
     MailModule,
+    DriverModule,
+    TechnicianModule,
   ],
 })
 export class AppModule implements NestModule {
