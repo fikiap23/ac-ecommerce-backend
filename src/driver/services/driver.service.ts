@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { CreateDriveryDto, UpdateDriveryDto } from '../dto/driver.dto';
+import { CreateDriverDto, UpdateDriverDto } from '../dto/driver.dto';
 import { DriverRepository } from '../repositories/driver.repository';
 
 @Injectable()
 export class DriverService {
   constructor(private readonly driverRepository: DriverRepository) {}
 
-  async create(dto: CreateDriveryDto) {
+  async create(dto: CreateDriverDto) {
     const { ...cleanDto } = dto;
     return await this.driverRepository.create({
       data: {
@@ -25,7 +25,7 @@ export class DriverService {
     });
   }
 
-  async updateByUuid(uuid: string, dto: UpdateDriveryDto) {
+  async updateByUuid(uuid: string, dto: UpdateDriverDto) {
     const capacity = await this.driverRepository.getThrowByUuid({
       uuid,
     });
