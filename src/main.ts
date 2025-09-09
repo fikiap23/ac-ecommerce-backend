@@ -4,6 +4,7 @@ import { AppModule } from './app.module';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import * as express from 'express';
 
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
@@ -17,7 +18,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     cors: true,
   });
-  app.useStaticAssets(join(__dirname, '/../public'));
+  app.use('/upload', express.static(join(process.cwd(), 'public', 'upload')));
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,

@@ -89,9 +89,17 @@ export class ProductQuery extends PrismaService {
           price: true,
           isActive: true,
           createdAt: true,
+          bundleImage: { select: { url: true } },
           items: {
             select: {
-              product: { select: { uuid: true, name: true, price: true } },
+              product: {
+                select: {
+                  uuid: true,
+                  name: true,
+                  price: true,
+                  productImage: { select: { url: true } },
+                },
+              },
             },
           },
         },

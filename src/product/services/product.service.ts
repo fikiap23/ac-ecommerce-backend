@@ -13,6 +13,11 @@ import { CustomError } from 'helpers/http.helper';
 import { ModelRepository } from '../repositories/model.repository';
 import { CapacityRepository } from '../repositories/capacity.repository';
 import { TypeRepository } from '../repositories/type.repository';
+import {
+  assertImages,
+  deleteFilesBestEffort,
+  saveImages,
+} from 'helpers/helper';
 
 @Injectable()
 export class ProductService {
@@ -25,7 +30,7 @@ export class ProductService {
     private readonly typeRepository: TypeRepository,
   ) {}
 
-  async create(dto: CreateProductDto, files?: Express.Multer.File[]) {
+  async create(dto: CreateProductDto) {
     const {
       packageType,
       serviceType,
@@ -36,182 +41,215 @@ export class ProductService {
       capacityUuid,
     } = dto;
 
-    // === VALIDASI TYPE, MODEL, CAPACITY ===
-    let typeConnect = undefined;
-    let modelConnect = undefined;
-    let capacityConnect = undefined;
-    let categoryProductConnect = undefined;
+    // === VALIDASI RELASI ===
+    let typeConnect: any = undefined;
+    let modelConnect: any = undefined;
+    let capacityConnect: any = undefined;
+    let categoryProductConnect: any = undefined;
 
     if (typeUuid) {
-      await this.typeRepository.getThrowByUuid({
-        uuid: typeUuid,
-      });
-
+      await this.typeRepository.getThrowByUuid({ uuid: typeUuid });
       typeConnect = { connect: { uuid: typeUuid } };
     }
-
     if (modelUuid) {
-      await this.modelRepository.getThrowByUuid({
-        uuid: modelUuid,
-      });
-
+      await this.modelRepository.getThrowByUuid({ uuid: modelUuid });
       modelConnect = { connect: { uuid: modelUuid } };
     }
-
     if (capacityUuid) {
-      await this.capacityRepository.getThrowByUuid({
-        uuid: capacityUuid,
-      });
-
+      await this.capacityRepository.getThrowByUuid({ uuid: capacityUuid });
       capacityConnect = { connect: { uuid: capacityUuid } };
     }
-
-    // === VALIDASI CATEGORY PRODUCT ===
-
-    if (dto.categoryProductUuid) {
+    if (dto.categoryProductUuid && packageType !== 'BUNDLE') {
       await this.categoryProductRepository.getThrowByUuid({
         uuid: dto.categoryProductUuid,
       });
       categoryProductConnect = { connect: { uuid: dto.categoryProductUuid } };
     }
 
-    // === CREATE PRODUCT / SERVICE / BUNDLE ===
-    switch (packageType) {
-      case 'SINGLE':
-        if (serviceType === 'SERVICE') {
-          return await this.prisma.product.create({
-            data: {
-              name: dto.name,
-              description: dto.description,
-              price: dto.price,
-              salePrice: dto.salePrice ?? null,
-              packageType,
-              serviceType,
-              isActive: dto.isActive ?? true,
-              type: typeConnect,
-              model: modelConnect,
-              capacity: capacityConnect,
-              categoryProduct: categoryProductConnect,
-              productImage: files?.length
-                ? {
-                    createMany: {
-                      data: files.map((f) => ({
-                        url: `/uploads/${f.filename}`,
-                      })),
-                    },
-                  }
-                : undefined,
-            },
+    // ============ FILE HANDLING RAPIH ============
+    // kumpulkan path untuk rollback jika DB gagal
+    const allAbsToCleanup: string[] = [];
+
+    const productImages = dto.productImages ?? [];
+    const variantImages = (variants ?? []).map((v) => v.image ?? []);
+
+    let productImageRows: { url: string }[] | undefined = undefined;
+    let variantPhotoUrls: (string | null)[] | undefined = undefined;
+    let bundleImageRows: { url: string }[] | undefined = undefined;
+
+    if (packageType === 'SINGLE') {
+      // validasi
+      assertImages(productImages);
+      variantImages.forEach(assertImages);
+
+      // simpan gambar produk
+      const savedProductImages = await saveImages(
+        productImages,
+        'upload/product/productImage',
+        'Product Image',
+      );
+      productImageRows = savedProductImages.map((s) => ({ url: s.url }));
+      allAbsToCleanup.push(...savedProductImages.map((s) => s.absPath));
+
+      const savedVariantImages = await Promise.all(
+        variantImages.map((imgs) =>
+          saveImages(imgs, 'upload/product/variantImage', 'Variant Image'),
+        ),
+      );
+      variantPhotoUrls = savedVariantImages.map((arr) =>
+        arr.length ? arr[0].url : null,
+      );
+      allAbsToCleanup.push(...savedVariantImages.flat().map((s) => s.absPath));
+    } else if (packageType === 'BUNDLE') {
+      // validasi
+      assertImages(productImages);
+
+      // simpan gambar bundle
+      const savedBundleImages = await saveImages(
+        productImages,
+        'upload/bundle/bundleImage',
+        'Bundle Image',
+      );
+      bundleImageRows = savedBundleImages.map((s) => ({ url: s.url }));
+      allAbsToCleanup.push(...savedBundleImages.map((s) => s.absPath));
+    }
+
+    try {
+      switch (packageType) {
+        case 'SINGLE': {
+          if (serviceType === 'SERVICE') {
+            const created = await this.prisma.$transaction(async (tx) => {
+              return tx.product.create({
+                data: {
+                  name: dto.name,
+                  description: dto.description,
+                  price: dto.price,
+                  salePrice: dto.salePrice ?? null,
+                  packageType,
+                  serviceType,
+                  isActive: dto.isActive ?? true,
+                  type: typeConnect,
+                  model: modelConnect,
+                  capacity: capacityConnect,
+                  categoryProduct: categoryProductConnect,
+                  productImage:
+                    (productImageRows?.length ?? 0) > 0
+                      ? { create: productImageRows }
+                      : undefined,
+                },
+              });
+            });
+            return created;
+          }
+
+          const created = await this.prisma.$transaction(async (tx) => {
+            return tx.product.create({
+              data: {
+                name: dto.name,
+                description: dto.description,
+                price: dto.price,
+                salePrice: dto.salePrice ?? null,
+                packageType,
+                serviceType,
+                isActive: dto.isActive ?? true,
+                type: typeConnect,
+                model: modelConnect,
+                capacity: capacityConnect,
+                categoryProduct: categoryProductConnect,
+                productImage:
+                  (productImageRows?.length ?? 0) > 0
+                    ? { create: productImageRows }
+                    : undefined,
+                productVariant:
+                  (variants?.length ?? 0) > 0
+                    ? {
+                        create: variants!.map((v, idx) => ({
+                          name: v.name,
+                          code: v.code,
+                          stock: v.stock,
+                          regularPrice: v.regularPrice,
+                          salePrice: v.salePrice ?? null,
+                          specification: v.specification ?? null,
+                          photoUrl: variantPhotoUrls?.[idx] || null,
+                        })),
+                      }
+                    : undefined,
+              },
+            });
           });
+          return created;
         }
 
-        // SINGLE PRODUCT
-        return await this.prisma.product.create({
-          data: {
-            name: dto.name,
-            description: dto.description,
-            price: dto.price,
-            salePrice: dto.salePrice ?? null,
-            packageType,
-            serviceType,
-            isActive: dto.isActive ?? true,
-            type: typeConnect,
-            model: modelConnect,
-            capacity: capacityConnect,
-            categoryProduct: categoryProductConnect,
-            productImage: files?.length
-              ? {
-                  createMany: {
-                    data: files.map((f) => ({ url: `/uploads/${f.filename}` })),
-                  },
-                }
-              : undefined,
-            productVariant: variants?.length
-              ? {
-                  createMany: {
-                    data: variants.map((v) => ({
-                      name: v.name,
-                      code: v.code,
-                      stock: v.stock,
-                      regularPrice: v.regularPrice,
-                      salePrice: v.salePrice ?? null,
-                      specification: v.specification ?? null,
-                    })),
-                  },
-                }
-              : undefined,
-          },
-        });
+        case 'BUNDLE': {
+          if (!dto.bundlingItems?.length) {
+            throw new CustomError({
+              message: 'Bundling items wajib diisi',
+              statusCode: 400,
+            });
+          }
 
-      case 'BUNDLE': {
-        if (!bundlingItems?.length) {
+          const products = await this.prisma.product.findMany({
+            where: {
+              uuid: { in: dto.bundlingItems.map((i) => i.productUuid) },
+            },
+            select: { id: true, uuid: true, price: true },
+          });
+          if (products.length !== dto.bundlingItems.length) {
+            throw new CustomError({
+              message: 'Bundling items tidak valid',
+              statusCode: 400,
+            });
+          }
+
+          const totalProductPrice = products.reduce(
+            (sum, p) => sum + p.price,
+            0,
+          );
+          const finalPrice = totalProductPrice - (dto.bundlingMinusPrice ?? 0);
+
+          const bundle = await this.prisma.$transaction(async (tx) => {
+            return tx.bundle.create({
+              data: {
+                name: dto.name,
+                description: dto.description,
+                minusPrice: dto.bundlingMinusPrice ?? null,
+                isActive: dto.isActive ?? true,
+                price: finalPrice,
+                bundleImage:
+                  (bundleImageRows?.length ?? 0) > 0
+                    ? { create: bundleImageRows }
+                    : undefined,
+                items: {
+                  createMany: {
+                    data: products.map((p) => ({ productId: p.id })),
+                  },
+                },
+              },
+              include: {
+                items: {
+                  include: {
+                    product: {
+                      select: { uuid: true, name: true, price: true },
+                    },
+                  },
+                },
+              },
+            });
+          });
+
+          return bundle;
+        }
+
+        default:
           throw new CustomError({
-            message: 'Bundling item wajib diisi',
+            message: 'Tipe produk tidak valid',
             statusCode: 400,
           });
-        }
-
-        // === Ambil produk yang ada ===
-        const products = await this.prisma.product.findMany({
-          where: {
-            uuid: { in: bundlingItems.map((i) => i.productUuid) },
-          },
-          select: { id: true, uuid: true, price: true },
-        });
-
-        if (products.length !== bundlingItems.length) {
-          throw new CustomError({
-            message: 'Salah satu produk tidak ditemukan',
-            statusCode: 404,
-          });
-        }
-
-        // === Hitung total harga bundle ===
-        const totalProductPrice = products.reduce((sum, p) => sum + p.price, 0);
-        const finalPrice = totalProductPrice - (dto.bundlingMinusPrice ?? 0);
-
-        // === CREATE BUNDLE SEKALIGUS DENGAN ITEMS ===
-        const bundle = await this.prisma.bundle.create({
-          data: {
-            name: dto.name,
-            description: dto.description,
-            minusPrice: dto.bundlingMinusPrice ?? null,
-            isActive: dto.isActive,
-            price: finalPrice,
-            bundleImage: files?.length
-              ? {
-                  createMany: {
-                    data: files.map((f) => ({
-                      url: `/uploads/${f.filename}`,
-                    })),
-                  },
-                }
-              : undefined,
-            items: {
-              createMany: {
-                data: products.map((p) => ({
-                  productId: p.id,
-                })),
-              },
-            },
-          },
-          include: {
-            items: {
-              include: {
-                product: { select: { uuid: true, name: true, price: true } },
-              },
-            },
-          },
-        });
-
-        return bundle;
       }
-
-      default:
-        throw new CustomError({
-          message: `Package type ${packageType} tidak dikenal`,
-          statusCode: 400,
-        });
+    } catch (e) {
+      // jika DB gagal → hapus file yang sudah tersimpan
+      await deleteFilesBestEffort(allAbsToCleanup);
+      throw e;
     }
   }
 
