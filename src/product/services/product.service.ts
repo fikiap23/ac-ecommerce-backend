@@ -6,7 +6,7 @@ import {
   ISelectGeneralProduct,
 } from '../interfaces/product.interface';
 import { CategoryProductRepository } from '../repositories/category-product.repository';
-import { Prisma } from '@prisma/client';
+import { Prisma, ProductVariant } from '@prisma/client';
 import { selectGeneralProduct } from 'src/prisma/queries/product/props/select-product.prop';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CustomError } from 'helpers/http.helper';
@@ -17,6 +17,7 @@ import {
   assertImages,
   deleteFilesBestEffort,
   saveImages,
+  urlToAbs,
 } from 'helpers/helper';
 
 @Injectable()
@@ -35,7 +36,6 @@ export class ProductService {
       packageType,
       serviceType,
       variants,
-      bundlingItems,
       typeUuid,
       modelUuid,
       capacityUuid,
@@ -123,6 +123,7 @@ export class ProductService {
                 data: {
                   name: dto.name,
                   description: dto.description,
+                  brand: dto.brand,
                   price: dto.price,
                   salePrice: dto.salePrice ?? null,
                   packageType,
@@ -146,6 +147,7 @@ export class ProductService {
             return tx.product.create({
               data: {
                 name: dto.name,
+                brand: dto.brand,
                 description: dto.description,
                 price: dto.price,
                 salePrice: dto.salePrice ?? null,
@@ -272,90 +274,301 @@ export class ProductService {
   }
 
   async updateProductByUuid(uuid: string, dto: UpdateProductDto) {
-    // validate
-    await this.productRepository.getThrowByUuid({ uuid });
-
-    // resolve category
-    const category = await this.categoryProductRepository.getThrowByUuid({
-      uuid: dto.categoryProductUuid,
-    });
-
-    const {
-      categoryProductUuid,
-      isActive,
-      productImages,
-      variants,
-      ...updateFields
-    } = dto;
-
-    // handle product images
-    let updateProductImage: Prisma.ProductImageCreateManyProductInput[] = [];
-    if (productImages?.length) {
-      const uploaded = await this.productRepository.uploadBulkProductImages(
-        productImages,
-      );
-      updateProductImage = productImages.map((item, idx) => ({
-        url: typeof item === 'string' ? item : uploaded[idx]?.url,
-      }));
-    }
-
-    // handle product variants
-    const variantOps = variants?.length
-      ? await Promise.all(
-          variants.map(async (variant) => {
-            let photoUrl: string | undefined;
-
-            if (variant.image?.length) {
-              const [uploaded] =
-                await this.productRepository.uploadBulkProductImages([
-                  variant.image[0],
-                ]);
-              photoUrl = uploaded.url;
-            }
-
-            const baseData = {
-              name: variant.name,
-              code: variant.code,
-              stock: variant.stock,
-              regularPrice: variant.regularPrice,
-              salePrice: variant.salePrice,
-              specification: variant.specification,
-              ...(photoUrl ? { photoUrl } : {}),
-            };
-
-            return variant.uuid
-              ? {
-                  where: { uuid: variant.uuid },
-                  update: baseData,
-                  create: baseData,
-                }
-              : {
-                  where: { uuid: '' },
-                  update: {},
-                  create: baseData,
-                };
-          }),
-        )
-      : [];
-
-    // update product
-    return this.productRepository.updateByUuid({
-      uuid,
-      data: {
-        ...updateFields,
-        isActive,
-        categoryProduct: { connect: { id: category.id } },
-        productImage: {
-          deleteMany: {},
-          ...(updateProductImage.length
-            ? { createMany: { data: updateProductImage } }
-            : {}),
-        },
-        ...(variantOps.length
-          ? { productVariant: { upsert: variantOps } }
-          : {}),
+    const existingProduct = await this.prisma.product.findUnique({
+      where: { uuid },
+      include: {
+        productImage: true,
+        productVariant: true,
       },
     });
+
+    const existingBundle = !existingProduct
+      ? await this.prisma.bundle.findUnique({
+          where: { uuid },
+          include: {
+            bundleImage: true,
+            items: {
+              include: { product: { select: { id: true, price: true } } },
+            },
+          },
+        })
+      : null;
+
+    if (!existingProduct && !existingBundle) {
+      throw new CustomError({
+        message: 'Produk tidak ditemukan',
+        statusCode: 404,
+      });
+    }
+
+    const isSingle = !!existingProduct;
+    const isBundle = !!existingBundle;
+
+    // ===== Validasi relasi opsional =====
+    let typeConnect: any = undefined;
+    let modelConnect: any = undefined;
+    let capacityConnect: any = undefined;
+    let categoryProductConnect: any = undefined;
+
+    if (dto.typeUuid) {
+      await this.typeRepository.getThrowByUuid({ uuid: dto.typeUuid });
+      typeConnect = { connect: { uuid: dto.typeUuid } };
+    }
+    if (dto.modelUuid) {
+      await this.modelRepository.getThrowByUuid({ uuid: dto.modelUuid });
+      modelConnect = { connect: { uuid: dto.modelUuid } };
+    }
+    if (dto.capacityUuid) {
+      await this.capacityRepository.getThrowByUuid({ uuid: dto.capacityUuid });
+      capacityConnect = { connect: { uuid: dto.capacityUuid } };
+    }
+    if (isSingle && dto.categoryProductUuid) {
+      await this.categoryProductRepository.getThrowByUuid({
+        uuid: dto.categoryProductUuid,
+      });
+      categoryProductConnect = { connect: { uuid: dto.categoryProductUuid } };
+    }
+
+    // ===== FILE HANDLING =====
+    const allAbsToCleanup: string[] = [];
+
+    // Galeri (produk/bundle)
+    const productImages = dto.productImages ?? [];
+    assertImages(productImages);
+
+    let productImageRows: { url: string }[] | undefined;
+    let bundleImageRows: { url: string }[] | undefined;
+
+    if (isSingle && productImages.length) {
+      const saved = await saveImages(
+        productImages,
+        'upload/product/productImage',
+        'Product Image',
+      );
+      productImageRows = saved.map((s) => ({ url: s.url }));
+      allAbsToCleanup.push(...saved.map((s) => s.absPath));
+    }
+    if (isBundle && productImages.length) {
+      const saved = await saveImages(
+        productImages,
+        'upload/bundle/bundleImage',
+        'Bundle Image',
+      );
+      bundleImageRows = saved.map((s) => ({ url: s.url }));
+      allAbsToCleanup.push(...saved.map((s) => s.absPath));
+    }
+
+    // Varian (SINGLE PRODUCT): proses per varian
+    type VariantUpdatePlan = {
+      kind: 'create' | 'update';
+      uuid?: string;
+      data: Omit<Prisma.ProductVariantCreateWithoutProductInput, 'product'> & {
+        photoUrl?: string | null;
+      };
+      // untuk hapus file lama jika ganti foto
+      oldPhotoAbs?: string | null;
+    };
+
+    const variantPlans: VariantUpdatePlan[] = [];
+
+    if (isSingle) {
+      const targetServiceType = dto.serviceType ?? existingProduct!.serviceType;
+      const isService = targetServiceType === 'SERVICE';
+
+      if (!isService && Array.isArray(dto.variants) && dto.variants.length) {
+        // Map existing variants by uuid untuk lookup cepat
+        const existingByUuid = new Map<string, ProductVariant>();
+        existingProduct!.productVariant.forEach((pv) =>
+          existingByUuid.set(pv.uuid, pv),
+        );
+
+        // Siapkan rencana per varian
+        for (let i = 0; i < dto.variants.length; i++) {
+          const v = dto.variants[i];
+
+          // Validasi & simpan image varian (ambil 1st)
+          let newPhotoUrl: string | null | undefined = undefined;
+          if (v.image?.length) {
+            assertImages(v.image);
+            const saved = await saveImages(
+              v.image,
+              'upload/product/variantImage',
+              'Variant Image',
+            );
+            allAbsToCleanup.push(...saved.map((s) => s.absPath));
+            newPhotoUrl = saved[0]?.url ?? null;
+          }
+
+          if (v.uuid && existingByUuid.has(v.uuid)) {
+            const current = existingByUuid.get(v.uuid)!;
+            variantPlans.push({
+              kind: 'update',
+              uuid: v.uuid,
+              data: {
+                name: v.name ?? undefined,
+                code: v.code ?? undefined,
+                stock: v.stock ?? undefined,
+                regularPrice: v.regularPrice ?? undefined,
+                salePrice: v.salePrice ?? undefined,
+                specification: v.specification ?? undefined,
+                photoUrl: newPhotoUrl ?? undefined, // set hanya jika ada foto baru
+              },
+              oldPhotoAbs: newPhotoUrl ? urlToAbs(current.photoUrl) : null,
+            });
+          } else {
+            // create varian baru
+            variantPlans.push({
+              kind: 'create',
+              data: {
+                name: v.name!,
+                code: v.code!,
+                stock: v.stock!,
+                regularPrice: v.regularPrice!,
+                salePrice: v.salePrice ?? null,
+                specification: v.specification ?? null,
+                photoUrl: newPhotoUrl ?? null,
+              },
+            });
+          }
+        }
+      }
+    }
+
+    // ===== TRANSAKSI =====
+    try {
+      if (isSingle) {
+        const updated = await this.prisma.$transaction(async (tx) => {
+          // 1) update produk dasar
+          const dataProduct: Prisma.ProductUpdateInput = {
+            name: dto.name ?? undefined,
+            brand: dto.brand ?? undefined,
+            description: dto.description ?? undefined,
+            price: dto.price ?? undefined,
+            salePrice: dto.salePrice ?? undefined,
+            isActive: dto.isActive ?? undefined,
+            serviceType: dto.serviceType ?? undefined,
+            type: typeConnect,
+            model: modelConnect,
+            capacity: capacityConnect,
+            categoryProduct: categoryProductConnect,
+            productImage:
+              (productImageRows?.length ?? 0) > 0
+                ? { create: productImageRows }
+                : undefined,
+          };
+
+          const prod = await tx.product.update({
+            where: { uuid },
+            data: dataProduct,
+          });
+
+          // 2) jalankan rencana varian (kalau ada)
+          for (const plan of variantPlans) {
+            if (plan.kind === 'update' && plan.uuid) {
+              await tx.productVariant.update({
+                where: { uuid: plan.uuid },
+                data: plan.data as Prisma.ProductVariantUpdateInput,
+              });
+            } else if (plan.kind === 'create') {
+              await tx.productVariant.create({
+                data: {
+                  ...(plan.data as Prisma.ProductVariantCreateWithoutProductInput),
+                  product: { connect: { id: prod.id } },
+                },
+              });
+            }
+          }
+
+          return prod;
+        });
+
+        // 3) hapus foto lama varian (yang diganti), best-effort
+        const oldToDelete = variantPlans
+          .map((p) => p.oldPhotoAbs)
+          .filter((x): x is string => !!x);
+        if (oldToDelete.length) await deleteFilesBestEffort(oldToDelete);
+
+        return updated;
+      }
+
+      // ===== BUNDLE =====
+      if (isBundle) {
+        // jika items dikirim → hitung ulang harga
+        let itemsData:
+          | {
+              deleteMany: Prisma.ProductBundleItemScalarWhereInput[];
+              createMany: { data: { productId: number }[] };
+            }
+          | undefined;
+        let newPrice: number | undefined;
+
+        if (dto.bundlingItems && dto.bundlingItems.length) {
+          const products = await this.prisma.product.findMany({
+            where: {
+              uuid: { in: dto.bundlingItems.map((i) => i.productUuid) },
+            },
+            select: { id: true, price: true },
+          });
+          if (products.length !== dto.bundlingItems.length) {
+            throw new CustomError({
+              message: 'Produk tidak ditemukan',
+              statusCode: 404,
+            });
+          }
+          const minus =
+            dto.bundlingMinusPrice ?? existingBundle!.minusPrice ?? 0;
+          newPrice = products.reduce((s, p) => s + p.price, 0) - minus;
+
+          itemsData = {
+            deleteMany: [{ bundleId: existingBundle!.id }],
+            createMany: { data: products.map((p) => ({ productId: p.id })) },
+          };
+        } else if (typeof dto.bundlingMinusPrice === 'number') {
+          // minus price berubah tapi items tetap → hitung ulang dari items existing
+          const sum = existingBundle!.items.reduce(
+            (s, it) => s + it.product.price,
+            0,
+          );
+          newPrice = sum - dto.bundlingMinusPrice;
+        }
+
+        const updated = await this.prisma.$transaction(async (tx) => {
+          return tx.bundle.update({
+            where: { uuid },
+            data: {
+              name: dto.name ?? undefined,
+              description: dto.description ?? undefined,
+              minusPrice: dto.bundlingMinusPrice ?? undefined,
+              isActive: dto.isActive ?? undefined,
+              price: typeof newPrice === 'number' ? newPrice : undefined,
+              bundleImage:
+                (bundleImageRows?.length ?? 0) > 0
+                  ? { create: bundleImageRows }
+                  : undefined,
+              items: itemsData,
+            },
+            include: {
+              items: {
+                include: {
+                  product: { select: { uuid: true, name: true, price: true } },
+                },
+              },
+            },
+          });
+        });
+
+        return updated;
+      }
+
+      throw new CustomError({
+        message: 'Tipe produk tidak valid',
+        statusCode: 400,
+      });
+    } catch (e) {
+      // rollback file baru jika transaksi gagal
+      await deleteFilesBestEffort(allAbsToCleanup);
+      throw e;
+    }
   }
 
   async deleteByUuid(uuid: string) {

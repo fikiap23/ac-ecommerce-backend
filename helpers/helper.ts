@@ -47,6 +47,18 @@ export const getFilename = (file?: Express.Multer.File) => {
   return fileName;
 };
 
+export function urlToAbs(url?: string | null): string | null {
+  if (!url) return null;
+  // url contoh: /upload/product/variantImage/xxx.webp
+  const clean = url.replace(/^\/+/, ''); // buang leading slash
+  const segments = clean.split('/').filter(Boolean);
+  try {
+    return safeJoin(BASE_PUBLIC, ...segments);
+  } catch {
+    return null;
+  }
+}
+
 export const createFileImageHelper = async (imageFile, writePath, fileName) => {
   // create directory if not exists
   mkdirSync(writePath, { recursive: true });

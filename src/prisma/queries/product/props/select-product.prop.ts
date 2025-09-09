@@ -3,6 +3,13 @@ import { Prisma } from '@prisma/client';
 export const selectGeneralProduct: Prisma.ProductSelect = {
   uuid: true,
   name: true,
+  brand: true,
+  capacity: true,
+  model: true,
+  type: true,
+  serviceType: true,
+  packageType: true,
+  salePrice: true,
   description: true,
   price: true,
   isActive: true,
