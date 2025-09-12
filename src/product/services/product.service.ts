@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ProductRepository } from '../repositories/product.repository';
-import { CreateProductDto, UpdateProductDto } from '../dto/product.dto';
+import {
+  CreateProductDto,
+  RemoveVariantDto,
+  UpdateProductDto,
+} from '../dto/product.dto';
 import {
   IFilterProduct,
   ISelectGeneralProduct,
@@ -591,5 +595,37 @@ export class ProductService {
         deletedAt: new Date(),
       },
     });
+  }
+
+  async removeVariantByUuid(dto: RemoveVariantDto) {
+    const product = await this.productRepository.getThrowByUuid({
+      uuid: dto.uuidProduct,
+      select: {
+        uuid: true,
+        id: true,
+        productVariant: {
+          select: {
+            uuid: true,
+            id: true,
+          },
+        },
+      },
+    });
+
+    if (
+      product.productVariant.find((v) => v.uuid === dto.uuidVariant) ===
+      undefined
+    ) {
+      throw new CustomError({
+        message: 'Variant tidak ditemukan',
+        statusCode: 404,
+      });
+    }
+
+    await this.prisma.productVariant.delete({
+      where: { uuid: dto.uuidVariant },
+    });
+
+    return product;
   }
 }

@@ -21,6 +21,7 @@ import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import {
   CreateProductDto,
   QueryProductDto,
+  RemoveVariantDto,
   UpdateProductDto,
 } from '../dto/product.dto';
 import { formatResponse } from 'helpers/http.helper';
@@ -81,6 +82,16 @@ export class ProductController {
 
       const result = await this.productService.create(dto);
       return formatResponse(res, HttpStatus.CREATED, result);
+    } catch (error) {
+      errorHandler(res, error);
+    }
+  }
+
+  @Delete('product/variant')
+  async async(@Body() dto: RemoveVariantDto, @Res() res: Response) {
+    try {
+      await this.productService.removeVariantByUuid(dto);
+      return formatResponse(res, HttpStatus.OK, null);
     } catch (error) {
       errorHandler(res, error);
     }

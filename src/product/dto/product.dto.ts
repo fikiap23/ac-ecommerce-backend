@@ -105,11 +105,11 @@ export class CreateProductDto {
   @IsNumber()
   salePrice?: number;
 
-  @IsBoolean()
+  @IsString()
   @IsOptional()
   isActive?: string;
 
-  @IsBoolean()
+  @IsString()
   @IsOptional()
   isHide?: string;
 
@@ -150,4 +150,12 @@ export class QueryProductDto extends SearchPaginationDto {
   @IsOptional()
   @IsString()
   isActive?: string;
+}
+
+export class RemoveVariantDto {
+  @IsString()
+  uuidProduct: string;
+
+  @IsString()
+  uuidVariant: string;
 }
