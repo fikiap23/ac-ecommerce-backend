@@ -13,6 +13,8 @@ export const selectGeneralProduct: Prisma.ProductSelect = {
   description: true,
   price: true,
   isActive: true,
+  isHide: true,
+  rating: true,
   createdAt: true,
 
   categoryProduct: {
