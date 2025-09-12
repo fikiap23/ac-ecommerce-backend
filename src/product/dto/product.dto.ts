@@ -97,13 +97,21 @@ export class CreateProductDto {
   @IsNotEmpty()
   price: number;
 
+  @IsNumber()
+  @IsOptional()
+  rating: number;
+
   @IsOptional()
   @IsNumber()
   salePrice?: number;
 
   @IsBoolean()
   @IsOptional()
-  isActive?: boolean;
+  isActive?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isHide?: string;
 
   @ValidateIf((o) => o.serviceType === TypeProductService.PRODUCT)
   @IsArray()

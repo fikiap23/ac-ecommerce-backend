@@ -19,6 +19,7 @@ import {
   saveImages,
   urlToAbs,
 } from 'helpers/helper';
+import { parseFormBoolean } from 'helpers/data.helper';
 
 @Injectable()
 export class ProductService {
@@ -128,7 +129,9 @@ export class ProductService {
                   salePrice: dto.salePrice ?? null,
                   packageType,
                   serviceType,
-                  isActive: dto.isActive ?? true,
+                  isActive: parseFormBoolean(dto.isActive),
+                  isHide: parseFormBoolean(dto.isHide),
+                  rating: dto.rating ?? null,
                   type: typeConnect,
                   model: modelConnect,
                   capacity: capacityConnect,
@@ -153,7 +156,9 @@ export class ProductService {
                 salePrice: dto.salePrice ?? null,
                 packageType,
                 serviceType,
-                isActive: dto.isActive ?? true,
+                isActive: parseFormBoolean(dto.isActive),
+                isHide: parseFormBoolean(dto.isHide),
+                rating: dto.rating ?? null,
                 type: typeConnect,
                 model: modelConnect,
                 capacity: capacityConnect,
@@ -215,8 +220,10 @@ export class ProductService {
                 name: dto.name,
                 description: dto.description,
                 minusPrice: dto.bundlingMinusPrice ?? null,
-                isActive: dto.isActive ?? true,
+                isActive: parseFormBoolean(dto.isActive),
+                isHide: parseFormBoolean(dto.isHide),
                 price: finalPrice,
+                rating: dto.rating ?? null,
                 bundleImage:
                   (bundleImageRows?.length ?? 0) > 0
                     ? { create: bundleImageRows }
@@ -445,7 +452,9 @@ export class ProductService {
             description: dto.description ?? undefined,
             price: dto.price ?? undefined,
             salePrice: dto.salePrice ?? undefined,
-            isActive: dto.isActive ?? undefined,
+            rating: dto.rating ?? undefined,
+            isActive: parseFormBoolean(dto.isActive),
+            isHide: parseFormBoolean(dto.isHide),
             serviceType: dto.serviceType ?? undefined,
             type: typeConnect,
             model: modelConnect,
@@ -539,8 +548,10 @@ export class ProductService {
               name: dto.name ?? undefined,
               description: dto.description ?? undefined,
               minusPrice: dto.bundlingMinusPrice ?? undefined,
-              isActive: dto.isActive ?? undefined,
+              isActive: parseFormBoolean(dto.isActive),
+              isHide: parseFormBoolean(dto.isHide),
               price: typeof newPrice === 'number' ? newPrice : undefined,
+              rating: dto.rating ?? undefined,
               bundleImage:
                 (bundleImageRows?.length ?? 0) > 0
                   ? { create: bundleImageRows }

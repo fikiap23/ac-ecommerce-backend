@@ -60,3 +60,7 @@ export function formatToISOE164(phone: string) {
 
   return '+' + cleaned;
 }
+
+export function parseFormBoolean(value?: any): boolean {
+  return value === 'true' || value === '1';
+}
