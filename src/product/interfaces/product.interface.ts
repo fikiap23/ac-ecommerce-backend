@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, TypeProductService } from '@prisma/client';
 import {
   selectGeneralProduct,
   selectProductForCreateOrder,
@@ -20,5 +20,10 @@ export type IFilterProduct = {
   limit: number;
   search?: string;
   isActive?: string;
+  isHide?: string;
+  typeUuid?: string;
+  modelUuid?: string;
+  capacityUuid?: string;
+  serviceType?: TypeProductService;
   categoryUuid?: string[];
 };
