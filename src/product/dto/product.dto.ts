@@ -150,6 +150,26 @@ export class QueryProductDto extends SearchPaginationDto {
   @IsOptional()
   @IsString()
   isActive?: string;
+
+  @IsOptional()
+  @IsString()
+  isHide?: string;
+
+  @IsOptional()
+  @IsString()
+  typeUuid: string;
+
+  @IsOptional()
+  @IsString()
+  modelUuid: string;
+
+  @IsOptional()
+  @IsString()
+  capacityUuid: string;
+
+  @IsEnum(TypeProductService)
+  @IsOptional()
+  serviceType?: TypeProductService;
 }
 
 export class RemoveVariantDto {
