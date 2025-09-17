@@ -8,8 +8,12 @@ export const selectCustomerProduct: Prisma.CustomerProductSelect = {
     select: {
       uuid: true,
       name: true,
+      brand: true,
+      packageType: true,
+      serviceType: true,
       description: true,
       price: true,
+      salePrice: true,
       isActive: true,
       categoryProduct: {
         select: {
