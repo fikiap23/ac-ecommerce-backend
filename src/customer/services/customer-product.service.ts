@@ -120,10 +120,45 @@ export class CustomerProductService {
       });
     }
 
+    if (customerProduct?.productVariantId) {
+      if (dto.productVariantUuid) {
+        const productVariant =
+          await this.productVariantRepository.getThrowByUuidAndProductId({
+            uuid: dto.productVariantUuid,
+            productId: customerProduct.productId,
+          });
+
+        const stock = productVariant.stock;
+
+        if (Number(stock) < dto.quantity) {
+          throw new CustomError({
+            message: 'Stok tidak mencukupi',
+            statusCode: 400,
+          });
+        }
+      } else {
+        const stock = productVariant.stock;
+
+        if (Number(stock) < dto.quantity) {
+          throw new CustomError({
+            message: 'Stok tidak mencukupi',
+            statusCode: 400,
+          });
+        }
+      }
+    }
+
     return await this.customerProductRepository.updateByUuid({
       uuid,
       data: {
         quantity: dto.quantity,
+        ...(dto.productVariantUuid && {
+          productVariant: {
+            connect: {
+              uuid: dto.productVariantUuid,
+            },
+          },
+        }),
       },
     });
   }
