@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 export const selectCustomerProduct: Prisma.CustomerProductSelect = {
   uuid: true,
   quantity: true,
+  productVariant: true,
   product: {
     select: {
       uuid: true,
