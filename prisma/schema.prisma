@@ -69,6 +69,11 @@ enum TypeProductService {
   SERVICE
 }
 
+enum TypeAddres {
+  ORDERED
+  RECIPIENT
+}
+
 model Customer {
   id          Int          @id @default(autoincrement())
   uuid        String       @unique @default(uuid())
@@ -101,8 +106,9 @@ model CustomerProduct {
 }
 
 model CustomerAddress {
-  id              Int      @id @default(autoincrement())
-  uuid            String   @unique @default(uuid())
+  id              Int        @id @default(autoincrement())
+  uuid            String     @unique @default(uuid())
+  type            TypeAddres @default(ORDERED)
   province        String
   city            String
   subDistrict     String
@@ -111,9 +117,9 @@ model CustomerAddress {
   label           String
   address         String
   details         String?
-  isMain          Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  isMain          Boolean    @default(false)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   customerId Int
@@ -375,10 +381,18 @@ model Order {
   updatedAt DateTime  @updatedAt
   expiredAt DateTime?
 
-  orderAddress         OrderAddress?
+  orderAddressId     Int?
+  recipientAddressId Int?
+
+  orderAddress     OrderAddress? @relation("Order_OrderAddress", fields: [orderAddressId], references: [id], onDelete: SetNull)
+  recipientAddress OrderAddress? @relation("Order_RecipientAddress", fields: [recipientAddressId], references: [id], onDelete: SetNull)
+
   orderProduct         OrderProduct[]
   orderVoucher         OrderVoucher?
   orderCallbackPayment OrderCallbackPayment?
+
+  @@index([orderAddressId])
+  @@index([recipientAddressId])
 }
 
 model OrderAddress {
@@ -395,8 +409,8 @@ model OrderAddress {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderId Int   @unique
+  usedAsOrderAddress     Order[] @relation("Order_OrderAddress")
+  usedAsRecipientAddress Order[] @relation("Order_RecipientAddress")
 }
 
 model OrderProduct {
@@ -404,6 +418,7 @@ model OrderProduct {
   uuid        String              @unique @default(uuid())
   packageType TypeProductPackage?
   serviceType TypeProductService?
+  deviceId    String?
   name        String
   brand       String?
   description String              @db.Text
