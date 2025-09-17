@@ -81,7 +81,16 @@ export class ProductQuery extends PrismaService {
         orderBy,
       }),
       prisma.bundle.findMany({
-        where: { deletedAt: null },
+        where: {
+          deletedAt: null,
+          isActive: true,
+          isHide: false,
+          items: {
+            every: {
+              product: { deletedAt: null, isActive: true },
+            },
+          },
+        },
         select: {
           uuid: true,
           name: true,
@@ -180,6 +189,22 @@ export class ProductQuery extends PrismaService {
     return await prisma.product.update({
       where: { uuid, deletedAt: null },
       data,
+    });
+  }
+
+  async findBundleByUuid({
+    tx,
+    uuid,
+    select,
+  }: {
+    tx?: Prisma.TransactionClient;
+    uuid: string;
+    select?: Prisma.BundleSelect;
+  }) {
+    const prisma = tx ?? this;
+    return await prisma.bundle.findUnique({
+      where: { uuid, deletedAt: null },
+      select,
     });
   }
 }

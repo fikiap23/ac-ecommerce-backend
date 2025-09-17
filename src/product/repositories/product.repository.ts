@@ -147,6 +147,64 @@ export class ProductRepository {
     return result;
   }
 
+  async getThrowBundleByUuid({
+    tx,
+    uuid,
+    select,
+  }: {
+    tx?: Prisma.TransactionClient;
+    uuid: string;
+    select?: Prisma.ProductSelect;
+  }) {
+    const result = await this.productQuery.findByUuid({
+      tx,
+      uuid,
+      select,
+    });
+
+    if (!result) {
+      throw new CustomError({
+        message: 'Product Tidak Ditemukan!',
+        statusCode: 404,
+      });
+    }
+
+    return result;
+  }
+
+  async getThrowProductOrBundleByUuid({
+    tx,
+    uuid,
+    selectProduct,
+    selectBundle,
+  }: {
+    tx?: Prisma.TransactionClient;
+    uuid: string;
+    selectProduct?: Prisma.ProductSelect;
+    selectBundle?: Prisma.BundleSelect;
+  }) {
+    const product = await this.productQuery.findByUuid({
+      tx,
+      uuid,
+      select: selectProduct,
+    });
+
+    const bundle = await this.productQuery.findBundleByUuid({
+      tx,
+      uuid,
+      select: selectBundle,
+    });
+
+    if (!product && !bundle) {
+      throw new CustomError({
+        message: 'Product Tidak Ditemukan!',
+        statusCode: 404,
+      });
+    }
+
+    return product || bundle;
+  }
+
   async updateByUuid({
     tx,
     uuid,

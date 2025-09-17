@@ -11,7 +11,10 @@ import {
 } from '../interfaces/product.interface';
 import { CategoryProductRepository } from '../repositories/category-product.repository';
 import { Prisma, ProductVariant } from '@prisma/client';
-import { selectGeneralProduct } from 'src/prisma/queries/product/props/select-product.prop';
+import {
+  selectGeneralProduct,
+  selectGenerealBundle,
+} from 'src/prisma/queries/product/props/select-product.prop';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CustomError } from 'helpers/http.helper';
 import { ModelRepository } from '../repositories/model.repository';
@@ -274,9 +277,10 @@ export class ProductService {
   }
 
   async getByUuid(uuid: string) {
-    const product = await this.productRepository.getThrowByUuid({
+    const product = await this.productRepository.getThrowProductOrBundleByUuid({
       uuid,
-      select: selectGeneralProduct,
+      selectProduct: selectGeneralProduct,
+      selectBundle: selectGenerealBundle,
     });
 
     return {
