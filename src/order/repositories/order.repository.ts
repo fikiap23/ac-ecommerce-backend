@@ -177,7 +177,7 @@ export class OrderRepository {
   }
 
   genTrackId(length: number) {
-    let result = 'NEOWEB-';
+    let result = 'TRX-';
     const characters = '0123456789';
     const charactersLength = characters.length;
 
