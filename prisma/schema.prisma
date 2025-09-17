@@ -185,21 +185,22 @@ model CategoryProduct {
 }
 
 model Product {
-  id          Int                @id @default(autoincrement())
-  uuid        String             @unique @default(uuid())
-  packageType TypeProductPackage @default(SINGLE)
-  serviceType TypeProductService @default(PRODUCT)
-  name        String
-  brand       String?
-  description String             @db.Text
-  price       Int
-  salePrice   Int?
-  rating      Float?
-  isHide      Boolean            @default(false)
-  isActive    Boolean            @default(true)
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  deletedAt   DateTime?
+  id             Int                @id @default(autoincrement())
+  uuid           String             @unique @default(uuid())
+  packageType    TypeProductPackage @default(SINGLE)
+  serviceType    TypeProductService @default(PRODUCT)
+  name           String
+  brand          String?
+  description    String             @db.Text
+  price          Int
+  salePrice      Int?
+  rating         Float?
+  countTotalSale Int?
+  isHide         Boolean            @default(false)
+  isActive       Boolean            @default(true)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  deletedAt      DateTime?
 
   typeId            Int?
   type              Type?            @relation(fields: [typeId], references: [id], onDelete: Cascade)
@@ -245,19 +246,20 @@ model Capacity {
 }
 
 model Bundle {
-  id          Int       @id @default(autoincrement())
-  uuid        String    @unique @default(uuid())
-  name        String
-  description String    @db.Text
-  minusPrice  Int?
-  price       Int
-  salePrice   Int?
-  rating      Float?
-  isHide      Boolean   @default(false)
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  id             Int       @id @default(autoincrement())
+  uuid           String    @unique @default(uuid())
+  name           String
+  description    String    @db.Text
+  minusPrice     Int?
+  price          Int
+  salePrice      Int?
+  rating         Float?
+  countTotalSale Int?
+  isHide         Boolean   @default(false)
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
 
   items       ProductBundleItem[]
   bundleImage BundleImage[]
