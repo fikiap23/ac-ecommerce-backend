@@ -96,6 +96,7 @@ export class OrderValidateRepository {
 
   validateSubTotalPay(subTotalPay: number, subTotalPayDto: number) {
     if (subTotalPay !== subTotalPayDto) {
+      console.log(`expected: ${subTotalPay}, actual: ${subTotalPayDto}`);
       throw new CustomError({
         message: 'Subtotal tidak valid',
         statusCode: 400,
