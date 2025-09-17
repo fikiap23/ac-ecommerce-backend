@@ -11,4 +11,7 @@ export const SelectGeneralCustomerAddress: Prisma.CustomerAddressSelect = {
   address: true,
   details: true,
   isMain: true,
+  type: true,
+  createdAt: true,
+  updatedAt: true,
 };

@@ -1,4 +1,5 @@
 import { PartialType } from '@nestjs/mapped-types';
+import { TypeAddres } from '@prisma/client';
 import { IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateCustomerAddressDto {
@@ -29,6 +30,10 @@ export class CreateCustomerAddressDto {
   @IsString()
   @IsNotEmpty()
   address: string;
+
+  @IsString()
+  @IsNotEmpty()
+  type: TypeAddres;
 
   @IsString()
   @IsOptional()

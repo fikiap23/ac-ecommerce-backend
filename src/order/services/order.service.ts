@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { CreateOrderDto, OrderNetDto } from '../dto/order.dto';
+import { CreateOrderDto, OrderNetDto, UpdateOrderDto } from '../dto/order.dto';
 import { ProductRepository } from 'src/product/repositories/product.repository';
 import { VoucherRepository } from 'src/voucher/repositories/voucher.repository';
 import { OrderRepository } from '../repositories/order.repository';
@@ -273,7 +273,9 @@ export class OrderService {
           orderAddress: {
             create: dto.shippingAddress,
           },
-
+          recipientAddress: {
+            create: dto.recipientAddress,
+          },
           orderProduct: {
             create: products.map((p) => {
               const cartItem = dto.carts.find((c) => c.productUuid === p.uuid);
@@ -282,6 +284,7 @@ export class OrderService {
               );
 
               return {
+                deviceId: cartItem.deviceId,
                 name: p.name,
                 brand: p.brand,
                 description: p.description,

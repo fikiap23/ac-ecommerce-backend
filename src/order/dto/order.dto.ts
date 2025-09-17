@@ -59,6 +59,10 @@ export class CartDto {
   @IsString()
   @IsNotEmpty()
   productVariantUuid: string;
+
+  @IsString()
+  @IsOptional()
+  deviceId?: string;
 }
 
 export class CreateOrderDto {
@@ -79,6 +83,11 @@ export class CreateOrderDto {
   @Type(() => ShippingAddressDto)
   @IsNotEmpty()
   shippingAddress: ShippingAddressDto;
+
+  @ValidateNested()
+  @Type(() => ShippingAddressDto)
+  @IsNotEmpty()
+  recipientAddress: ShippingAddressDto;
 
   @ValidateNested({ each: true })
   @Type(() => CartDto)
