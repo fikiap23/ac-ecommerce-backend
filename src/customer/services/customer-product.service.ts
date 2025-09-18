@@ -45,22 +45,21 @@ export class CustomerProductService {
           statusCode: 400,
         });
       }
-    }
-
-    // Cek apakah sudah ada di keranjang
-    const isInCart = await this.customerProductRepository.getMany({
-      where: {
-        customerId: customer.id,
-        productId: product.id,
-        productVariantId: productVariant?.id,
-      },
-    });
-
-    if (isInCart.length) {
-      throw new CustomError({
-        message: 'Produk sudah ada di keranjang',
-        statusCode: 400,
+      // Cek apakah sudah ada di keranjang
+      const isInCart = await this.customerProductRepository.getMany({
+        where: {
+          customerId: customer.id,
+          productId: product.id,
+          productVariantId: productVariant?.id,
+        },
       });
+
+      if (isInCart.length) {
+        throw new CustomError({
+          message: 'Produk sudah ada di keranjang',
+          statusCode: 400,
+        });
+      }
     }
 
     // Insert ke keranjang
