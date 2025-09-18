@@ -10,6 +10,8 @@ export const SelectGeneralCustomerOrder: Prisma.OrderSelect = {
   trackId: true,
   createdAt: true,
   status: true,
+  driverName: true,
+  technicianName: true,
   orderAddress: {
     select: {
       address: true,
@@ -20,6 +22,7 @@ export const SelectGeneralCustomerOrder: Prisma.OrderSelect = {
       quantity: true,
       name: true,
       price: true,
+      deviceId: true,
       orderProductImage: {
         select: {
           uuid: true,
