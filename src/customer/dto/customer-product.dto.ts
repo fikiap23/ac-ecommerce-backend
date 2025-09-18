@@ -13,8 +13,8 @@ export class CreateCustomerProductDto {
   productUuid: string;
 
   @IsString()
-  @IsNotEmpty()
-  productVariantUuid: string;
+  @IsOptional()
+  productVariantUuid?: string;
 
   @IsString()
   @IsOptional()

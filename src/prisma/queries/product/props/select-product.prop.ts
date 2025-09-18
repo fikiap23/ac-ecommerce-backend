@@ -85,4 +85,5 @@ export const selectProductForCreateOrder: Prisma.ProductSelect = {
 
 export const selectProductForCreateCustomerProduct: Prisma.ProductSelect = {
   id: true,
+  serviceType: true,
 };

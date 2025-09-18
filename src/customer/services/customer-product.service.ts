@@ -34,15 +34,17 @@ export class CustomerProductService {
       select: selectProductForCreateCustomerProduct,
     });
 
-    const productVariant = await this.productVariantRepository.getThrowByUuid({
-      uuid: dto.productVariantUuid,
-    });
-
-    if (Number(productVariant.stock) < dto.quantity) {
-      throw new CustomError({
-        message: 'Stok tidak mencukupi',
-        statusCode: 400,
+    let productVariant: ProductVariant | null = null;
+    if (product.serviceType == 'PRODUCT') {
+      productVariant = await this.productVariantRepository.getThrowByUuid({
+        uuid: dto.productVariantUuid,
       });
+      if (Number(productVariant.stock) < dto.quantity) {
+        throw new CustomError({
+          message: 'Stok tidak mencukupi',
+          statusCode: 400,
+        });
+      }
     }
 
     // Cek apakah sudah ada di keranjang
@@ -50,7 +52,7 @@ export class CustomerProductService {
       where: {
         customerId: customer.id,
         productId: product.id,
-        productVariantId: productVariant.id,
+        productVariantId: productVariant?.id,
       },
     });
 
