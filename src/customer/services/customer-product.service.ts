@@ -74,9 +74,9 @@ export class CustomerProductService {
         product: {
           connect: { id: product.id },
         },
-        productVariant: {
-          connect: { id: productVariant?.id },
-        },
+        ...(productVariant && {
+          productVariant: { connect: { id: productVariant.id } },
+        }),
       },
     });
   }
