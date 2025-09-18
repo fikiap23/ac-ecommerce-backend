@@ -5,13 +5,19 @@ import {
   Headers,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   Res,
   UseGuards,
 } from '@nestjs/common';
 import { OrderService } from './services/order.service';
-import { CreateOrderDto, OrderNetDto, QueryOrderDto } from './dto/order.dto';
+import {
+  CreateOrderDto,
+  OrderNetDto,
+  QueryOrderDto,
+  UpdateOrderStatusDto,
+} from './dto/order.dto';
 import { Response } from 'express';
 import { formatResponse } from 'helpers/http.helper';
 import { errorHandler } from 'helpers/validation.helper';
@@ -52,6 +58,17 @@ export class OrderController {
       const { sub } = await this.authService.decodeJwtToken(authorization);
       const result = await this.orderService.createOrder(sub, dto);
       return formatResponse(res, HttpStatus.CREATED, result);
+    } catch (error) {
+      errorHandler(res, error);
+    }
+  }
+  @UseGuards(JwtGuard)
+  @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN)
+  @Patch('order/status')
+  async updateOrder(@Body() dto: UpdateOrderStatusDto, @Res() res: Response) {
+    try {
+      await this.orderService.updateOrderStatus(dto);
+      return formatResponse(res, HttpStatus.OK, null);
     } catch (error) {
       errorHandler(res, error);
     }

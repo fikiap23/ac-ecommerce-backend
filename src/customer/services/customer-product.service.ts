@@ -68,6 +68,7 @@ export class CustomerProductService {
           connect: { id: customer.id },
         },
         quantity: dto.quantity,
+        deviceId: dto.deviceId,
         product: {
           connect: { id: product.id },
         },
@@ -152,6 +153,7 @@ export class CustomerProductService {
       uuid,
       data: {
         quantity: dto.quantity,
+        deviceId: dto.deviceId,
         ...(dto.productVariantUuid && {
           productVariant: {
             connect: {

@@ -94,6 +94,7 @@ model CustomerProduct {
   id        Int      @id @default(autoincrement())
   uuid      String   @unique @default(uuid())
   quantity  Int
+  deviceId  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -378,10 +379,17 @@ model Order {
   customerId            Int?
   voucherId             Int?
   status                TypeStatusOrder @default(WAITING_PAYMENT)
+  notes                 String?
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  expiredAt DateTime?
+  scheduledAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  expiredAt   DateTime?
+
+  driverId       Int?
+  driverName     String?
+  technicianId   Int?
+  technicianName String?
 
   orderAddressId     Int?
   recipientAddressId Int?

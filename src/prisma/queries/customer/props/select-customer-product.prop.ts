@@ -4,6 +4,7 @@ export const selectCustomerProduct: Prisma.CustomerProductSelect = {
   uuid: true,
   quantity: true,
   productVariant: true,
+  deviceId: true,
   product: {
     select: {
       uuid: true,

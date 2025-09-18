@@ -17,4 +17,16 @@ export class OrderProductRepository {
   }) {
     return await this.orderProductQuery.findMany({ tx, where, select });
   }
+
+  async updateByUuid({
+    tx,
+    uuid,
+    data,
+  }: {
+    tx?: Prisma.TransactionClient;
+    uuid: string;
+    data: Prisma.OrderProductUpdateInput;
+  }) {
+    return await this.orderProductQuery.updateByUuid({ tx, uuid, data });
+  }
 }

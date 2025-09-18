@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { CreateOrderDto, OrderNetDto, UpdateOrderDto } from '../dto/order.dto';
+import {
+  CreateOrderDto,
+  OrderNetDto,
+  UpdateOrderDto,
+  UpdateOrderStatusDto,
+} from '../dto/order.dto';
 import { ProductRepository } from 'src/product/repositories/product.repository';
 import { VoucherRepository } from 'src/voucher/repositories/voucher.repository';
 import { OrderRepository } from '../repositories/order.repository';
@@ -11,7 +16,7 @@ import {
   ISelectGeneralOrder,
 } from '../interfaces/order.interface';
 import { GatewayService } from 'src/gateway/services/gateway.service';
-import { Customer, TypeStatusOrder } from '@prisma/client';
+import { Customer, OrderProduct, TypeStatusOrder } from '@prisma/client';
 import { GatewayXenditRepository } from 'src/gateway/repositories/gateway-xendit.repository';
 import { MailService } from 'src/mail/services/mail.service';
 import { CustomError } from 'helpers/http.helper';
@@ -43,6 +48,7 @@ import {
 } from 'src/gateway/interfaces/gateway-xendit.interface';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CustomerVoucherRepository } from 'src/customer/repositories/customer-voucher.repository';
+import { OrderProductRepository } from '../repositories/order-product.repository';
 
 @Injectable()
 export class OrderService {
@@ -58,6 +64,7 @@ export class OrderService {
     private readonly orderCallbackPaymentRepository: OrderCallbackPaymentRepository,
     private readonly prismaService: PrismaService,
     private readonly customerVoucher: CustomerVoucherRepository,
+    private readonly orderProductRepository: OrderProductRepository,
   ) {}
 
   async validateMembership(authorization: string) {
@@ -873,5 +880,84 @@ export class OrderService {
     const { id, voucherId, customerId, paymentMethod, ...response } = order;
 
     return response;
+  }
+
+  async updateOrderStatus(dto: UpdateOrderStatusDto) {
+    const { orderUuid, productOrders, scheduleAt, ...rest } = dto;
+
+    // Validasi scheduleAt
+    const scheduleAtDate = scheduleAt ? new Date(scheduleAt) : undefined;
+    if (scheduleAt && isNaN(scheduleAtDate.getTime())) {
+      throw new CustomError({
+        message: 'scheduleAt tidak valid (harus ISO string)',
+        statusCode: 400,
+      });
+    }
+
+    type OrderUpdateInput = {
+      status?: TypeStatusOrder;
+      technicianUuid?: string | null;
+      driverUuid?: string | null;
+      notes?: string | null;
+      scheduleAt?: Date | null;
+    };
+
+    return this.prismaService.execTx(async (tx) => {
+      // Check order
+      const order = await this.orderRepository.getThrowByUuid({
+        uuid: orderUuid,
+        select: selectGeneralOrder,
+        tx,
+      });
+
+      const data: OrderUpdateInput = {
+        status: rest.status,
+        technicianUuid: rest.technicianUuid,
+        driverUuid: rest.driverUuid,
+        notes: rest.notes,
+        scheduleAt: scheduleAtDate,
+      };
+
+      await this.orderRepository.update({
+        where: { uuid: orderUuid },
+        data,
+        tx,
+      });
+
+      // Update productOrders
+      if (productOrders?.length) {
+        const ids = productOrders.map((p) => p.orderProductUuid);
+
+        const found = await this.orderProductRepository.getMany({
+          where: { orderId: order.id, uuid: { in: ids } },
+          select: { uuid: true },
+          tx,
+        });
+
+        const validSet = new Set(found.map((x) => x.uuid));
+        const invalid = productOrders.filter(
+          (p) => !validSet.has(p.orderProductUuid),
+        );
+
+        if (invalid.length > 0) {
+          throw new CustomError({
+            message: `orderProductUuid tidak valid: ${invalid
+              .map((i) => i.orderProductUuid)
+              .join(', ')}`,
+            statusCode: 400,
+          });
+        }
+
+        for (const p of productOrders) {
+          await this.orderProductRepository.updateByUuid({
+            uuid: p.orderProductUuid,
+            data: { deviceId: p.deviceId },
+            tx,
+          });
+        }
+      }
+
+      return null;
+    });
   }
 }

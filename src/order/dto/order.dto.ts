@@ -140,3 +140,42 @@ export class OrderNetDto {
   @IsString()
   endDate?: string;
 }
+
+export class UpdateProductOrderDeviceDto {
+  @IsString()
+  orderProductUuid: string;
+
+  @IsString()
+  deviceId: string;
+}
+
+export class UpdateOrderStatusDto {
+  @IsString()
+  @IsNotEmpty()
+  orderUuid: string;
+
+  @IsOptional()
+  @IsEnum(TypeStatusOrder)
+  status?: TypeStatusOrder;
+
+  @IsOptional()
+  @IsString()
+  technicianUuid?: string;
+
+  @IsOptional()
+  @IsString()
+  driverUuid?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsString()
+  scheduleAt?: string;
+
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateProductOrderDeviceDto)
+  productOrders?: UpdateProductOrderDeviceDto[];
+}

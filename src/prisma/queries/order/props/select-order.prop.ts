@@ -202,6 +202,15 @@ export const selectOrderByUuid: Prisma.OrderSelect = {
   createdAt: true,
   trackId: true,
   name: true,
+  driverId: true,
+  driverName: true,
+  technicianId: true,
+  technicianName: true,
+  deliveryService: true,
+  recipientAddress: true,
+  notes: true,
+  scheduledAt: true,
+
   orderAddress: {
     select: {
       address: true,
@@ -230,4 +239,7 @@ export const selectOrderByUuid: Prisma.OrderSelect = {
   netAmount: true,
   status: true,
   expiredAt: true,
+  phoneNumber: true,
+  email: true,
+  updatedAt: true,
 };
