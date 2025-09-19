@@ -69,6 +69,7 @@ export const selectProductForCreateOrder: Prisma.ProductSelect = {
   uuid: true,
   name: true,
   description: true,
+  serviceType: true,
   price: true,
   salePrice: true,
   isActive: true,
