@@ -155,12 +155,16 @@ export class OrderValidateRepository {
   async validateProductsWithVariants(
     carts: {
       productUuid: string;
-      productVariantUuid: string;
+      productVariantUuid?: string; // boleh kosong utk SERVICE
       quantity: number;
     }[],
     products: (Product & { productVariant: ProductVariant[] })[],
   ) {
-    const validatedItems = [];
+    const validatedItems: {
+      product: Product;
+      variant?: ProductVariant | null;
+      quantity: number;
+    }[] = [];
 
     for (const cart of carts) {
       const product = products.find((p) => p.uuid === cart.productUuid);
@@ -172,29 +176,49 @@ export class OrderValidateRepository {
         });
       }
 
-      const variant = product.productVariant.find(
-        (v) => v.uuid === cart.productVariantUuid,
-      );
+      const serviceType = String(
+        (product as any).serviceType || '',
+      ).toUpperCase();
+      const isProductType = serviceType === 'PRODUCT';
 
-      if (!variant) {
-        throw new CustomError({
-          message: `Varian produk tidak ditemukan untuk produk ${product.name}`,
-          statusCode: 404,
+      if (isProductType) {
+        if (!cart.productVariantUuid) {
+          throw new CustomError({
+            message: `Varian wajib dipilih untuk produk ${product.name}`,
+            statusCode: 400,
+          });
+        }
+
+        const variant = product.productVariant.find(
+          (v) => v.uuid === cart.productVariantUuid,
+        );
+
+        if (!variant) {
+          throw new CustomError({
+            message: `Varian produk tidak ditemukan untuk produk ${product.name}`,
+            statusCode: 404,
+          });
+        }
+
+        if (variant.stock < cart.quantity) {
+          throw new CustomError({
+            message: `Stok varian ${variant.name} tidak mencukupi`,
+            statusCode: 400,
+          });
+        }
+
+        validatedItems.push({
+          product,
+          variant,
+          quantity: cart.quantity,
+        });
+      } else {
+        validatedItems.push({
+          product,
+          variant: null,
+          quantity: cart.quantity,
         });
       }
-
-      if (variant.stock < cart.quantity) {
-        throw new CustomError({
-          message: `Stok varian ${variant.name} tidak mencukupi`,
-          statusCode: 400,
-        });
-      }
-
-      validatedItems.push({
-        product,
-        variant,
-        quantity: cart.quantity,
-      });
     }
 
     return validatedItems;

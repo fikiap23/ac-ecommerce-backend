@@ -57,8 +57,8 @@ export class CartDto {
   quantity: number;
 
   @IsString()
-  @IsNotEmpty()
-  productVariantUuid: string;
+  @IsOptional()
+  productVariantUuid?: string;
 
   @IsString()
   @IsOptional()

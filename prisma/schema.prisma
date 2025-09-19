@@ -432,7 +432,7 @@ model OrderProduct {
   name        String
   brand       String?
   description String              @db.Text
-  type        String
+  type        String?
   model       String?
   capacity    String?
   price       Int
@@ -446,7 +446,7 @@ model OrderProduct {
   orderProductImage OrderProductImage[]
 
   orderProductId        Int
-  orderProductVariantId Int
+  orderProductVariantId Int?
 
   order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderId Int

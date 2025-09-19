@@ -70,6 +70,7 @@ export const selectProductForCreateOrder: Prisma.ProductSelect = {
   name: true,
   description: true,
   price: true,
+  salePrice: true,
   isActive: true,
   createdAt: true,
   updatedAt: true,

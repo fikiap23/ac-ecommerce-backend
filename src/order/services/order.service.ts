@@ -277,42 +277,82 @@ export class OrderService {
           deliveryFee,
           totalPayment,
           customerId: customer.id,
-          orderAddress: {
-            create: dto.shippingAddress,
-          },
-          recipientAddress: {
-            create: dto.recipientAddress,
-          },
+
+          orderAddress: { create: dto.shippingAddress },
+          recipientAddress: { create: dto.recipientAddress },
+
           orderProduct: {
             create: products.map((p) => {
               const cartItem = dto.carts.find((c) => c.productUuid === p.uuid);
-              const variant = p.productVariant.find(
-                (v) => v.uuid === cartItem.productVariantUuid,
-              );
+              if (!cartItem) {
+                throw new CustomError({
+                  message: `Cart item untuk produk ${
+                    p.name ?? '(tanpa nama)'
+                  } tidak ditemukan`,
+                  statusCode: 400,
+                });
+              }
+
+              const isProductType =
+                String(p.serviceType).toUpperCase() === 'PRODUCT';
+
+              // Ambil variant hanya untuk PRODUCT
+              const variant = isProductType
+                ? p.productVariant.find(
+                    (v) => v.uuid === cartItem.productVariantUuid,
+                  )
+                : undefined;
+
+              if (isProductType && !variant) {
+                throw new CustomError({
+                  message: `Varian produk tidak ditemukan untuk produk ${
+                    p.name ?? '(tanpa nama)'
+                  } `,
+                  statusCode: 404,
+                });
+              }
+
+              const price = isProductType
+                ? variant!.salePrice ?? variant!.regularPrice
+                : p.salePrice ?? p.price;
+
+              if (price == null || Number.isNaN(Number(price))) {
+                throw new CustomError({
+                  message: isProductType
+                    ? `Harga varian ${p.name ?? '(tanpa nama)'} tidak valid`
+                    : `Harga layanan ${p.name ?? '(tanpa nama)'} tidak valid`,
+                  statusCode: 400,
+                });
+              }
+
+              const typeName = p.type?.name ?? null;
+              const modelName = p.model?.name ?? null;
+              const capacityName = p.capacity?.name ?? null;
+              const categoryName = p.categoryProduct?.name ?? null;
 
               return {
                 deviceId: cartItem.deviceId,
-                name: p.name,
-                brand: p.brand,
-                description: p.description,
-                type: p.type.name,
-                model: p.model.name,
-                capacity: p.capacity.name,
-                price: variant.salePrice ?? variant.regularPrice,
+                name: p.name ?? '',
+                brand: p.brand ?? null,
+                description: p.description ?? null,
+                type: typeName,
+                model: modelName,
+                capacity: capacityName,
+                price: Number(price),
                 packageType: p.packageType,
                 serviceType: p.serviceType,
 
-                category: p.categoryProduct.name,
+                category: categoryName,
                 orderProductId: p.id,
-                orderProductVariantId: variant.id,
-                quantity: cartItem?.quantity ?? 0,
+                orderProductVariantId: isProductType ? variant!.id : undefined,
+                quantity: cartItem.quantity,
                 discount: 0,
 
                 createdAt: new Date(),
                 updatedAt: new Date(),
 
                 orderProductImage: {
-                  create: p.productImage.map((pi) => ({
+                  create: (p.productImage ?? []).map((pi) => ({
                     url: pi.url,
                     createdAt: new Date(),
                     updatedAt: new Date(),
@@ -382,19 +422,63 @@ export class OrderService {
         address: data.orderAddress.address,
         products: products.map((p) => {
           const cartItem = dto.carts.find((c) => c.productUuid === p.uuid);
-          const variant = p.productVariant.find(
-            (v) => v.uuid === cartItem.productVariantUuid,
-          );
+          if (!cartItem) {
+            throw new CustomError({
+              message: `Cart item untuk produk ${
+                p.name ?? '(tanpa nama)'
+              } tidak ditemukan`,
+              statusCode: 400,
+            });
+          }
+
+          const isProductType =
+            String(p.serviceType).toUpperCase() === 'PRODUCT';
+
+          if (isProductType) {
+            // Wajib ada variant untuk PRODUCT
+            if (!cartItem.productVariantUuid) {
+              throw new CustomError({
+                message: `Varian wajib dipilih untuk produk ${p.name}`,
+                statusCode: 400,
+              });
+            }
+
+            const variant = p.productVariant.find(
+              (v) => v.uuid === cartItem.productVariantUuid,
+            );
+            if (!variant) {
+              throw new CustomError({
+                message: `Varian produk tidak ditemukan untuk produk ${p.name}`,
+                statusCode: 404,
+              });
+            }
+
+            const priceNum = variant.salePrice ?? variant.regularPrice;
+            return {
+              name: `${p.name} - ${variant.name}`,
+              price: String(priceNum),
+              qty: cartItem.quantity,
+              discount: '0',
+            };
+          }
+
+          // SERVICE (atau selain PRODUCT): abaikan variant, pakai harga produk
+          const priceNum = p.salePrice ?? p.salePrice ?? p.price;
+          if (priceNum == null || Number.isNaN(Number(priceNum))) {
+            throw new CustomError({
+              message: `Harga layanan ${p.name ?? '(tanpa nama)'} tidak valid`,
+              statusCode: 400,
+            });
+          }
 
           return {
-            name: `${p.name} - ${variant.name}`,
-            price: variant.salePrice
-              ? variant.salePrice.toString()
-              : variant.regularPrice.toString(),
+            name: p.name,
+            price: String(priceNum),
             qty: cartItem.quantity,
             discount: '0',
           };
         }),
+
         subtotal: data.subTotalPay.toString(),
         totalDiscount:
           sub && dto.voucherUuid ? dto.voucherDiscount.toString() : '0',

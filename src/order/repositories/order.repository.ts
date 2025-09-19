@@ -35,7 +35,6 @@ export class OrderRepository {
     })[],
   ): Promise<number> {
     const productMap = new Map(products.map((p) => [p.uuid, p]));
-
     let totalAmount = 0;
 
     for (const cartItem of carts) {
@@ -48,18 +47,50 @@ export class OrderRepository {
         });
       }
 
-      const variant = product.productVariant.find(
-        (v) => v.uuid === cartItem.productVariantUuid,
-      );
+      const isProductType =
+        String(product.serviceType).toUpperCase() === 'PRODUCT';
 
-      if (!variant) {
-        throw new CustomError({
-          message: `Varian produk tidak ditemukan untuk produk ${product.name}`,
-          statusCode: 404,
-        });
+      if (isProductType) {
+        // Wajib ada variant utk PRODUCT
+        if (!cartItem.productVariantUuid) {
+          throw new CustomError({
+            message: `Varian wajib dipilih untuk produk ${product.name}`,
+            statusCode: 400,
+          });
+        }
+
+        const variant = product.productVariant.find(
+          (v) => v.uuid === cartItem.productVariantUuid,
+        );
+
+        if (!variant) {
+          throw new CustomError({
+            message: `Varian produk tidak ditemukan untuk produk ${product.name}`,
+            statusCode: 404,
+          });
+        }
+
+        const priceToUse = variant.salePrice ?? variant.regularPrice;
+
+        if (priceToUse == null || Number.isNaN(Number(priceToUse))) {
+          throw new CustomError({
+            message: `Harga varian ${product.name} tidak valid`,
+            statusCode: 400,
+          });
+        }
+
+        totalAmount += Number(priceToUse) * cartItem.quantity;
+        continue;
       }
 
-      const priceToUse = variant.salePrice ?? variant.regularPrice;
+      const priceToUse = product.salePrice ?? product.price;
+
+      if (priceToUse == null || Number.isNaN(Number(priceToUse))) {
+        throw new CustomError({
+          message: `Harga produk layanan ${product.name} tidak valid`,
+          statusCode: 400,
+        });
+      }
 
       totalAmount += Number(priceToUse) * cartItem.quantity;
     }
