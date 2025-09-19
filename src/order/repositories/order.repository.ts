@@ -79,6 +79,9 @@ export class OrderRepository {
         }
 
         totalAmount += Number(priceToUse) * cartItem.quantity;
+        console.log('PRODUCT');
+        console.log(totalAmount);
+        console.log(variant.salePrice, variant.regularPrice);
       } else {
         const priceToUse = product.salePrice ?? product.price;
 
