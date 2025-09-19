@@ -80,19 +80,18 @@ export class OrderRepository {
         }
 
         totalAmount += Number(priceToUse) * cartItem.quantity;
-        continue;
+      } else {
+        const priceToUse = product.salePrice ?? product.price;
+
+        if (priceToUse == null || Number.isNaN(Number(priceToUse))) {
+          throw new CustomError({
+            message: `Harga produk layanan ${product.name} tidak valid`,
+            statusCode: 400,
+          });
+        }
+
+        totalAmount += Number(priceToUse) * cartItem.quantity;
       }
-
-      const priceToUse = product.salePrice ?? product.price;
-
-      if (priceToUse == null || Number.isNaN(Number(priceToUse))) {
-        throw new CustomError({
-          message: `Harga produk layanan ${product.name} tidak valid`,
-          statusCode: 400,
-        });
-      }
-
-      totalAmount += Number(priceToUse) * cartItem.quantity;
     }
 
     return totalAmount;
