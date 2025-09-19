@@ -47,8 +47,7 @@ export class OrderRepository {
         });
       }
 
-      const isProductType =
-        String(product.serviceType).toUpperCase() === 'PRODUCT';
+      const isProductType = product.serviceType === 'PRODUCT';
 
       if (isProductType) {
         // Wajib ada variant utk PRODUCT
