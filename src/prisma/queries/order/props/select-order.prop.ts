@@ -90,6 +90,15 @@ export const selectGeneralListOrders: Prisma.OrderSelect = {
       retailOutletReferenceId: true,
     },
   },
+  orderProduct: {
+    select: {
+      packageType: true,
+      serviceType: true,
+      quantity: true,
+      name: true,
+      price: true,
+    },
+  },
   totalPayment: true,
   netAmount: true,
   isNetAmountCalculated: true,

@@ -849,6 +849,7 @@ export class OrderService {
       data: orders.data.map((order: ISelectGeneralListOrder) => {
         return {
           uuid: order.uuid,
+          orderProduct: order.orderProduct,
           trackId: order.trackId,
           createdAt: order.createdAt,
           name: order.name,
