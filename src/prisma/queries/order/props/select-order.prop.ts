@@ -3,6 +3,9 @@ import { Prisma } from '@prisma/client';
 export const selectOrderProductWithRelations: Prisma.OrderProductSelect = {
   id: true,
   uuid: true,
+  serviceType: true,
+  packageType: true,
+  deviceId: true,
   name: true,
   category: true,
   description: true,
@@ -44,6 +47,9 @@ export const selectGeneralOrder: Prisma.OrderSelect = {
     select: {
       id: true,
       uuid: true,
+      serviceType: true,
+      packageType: true,
+      deviceId: true,
       name: true,
       category: true,
       description: true,
@@ -92,8 +98,11 @@ export const selectGeneralListOrders: Prisma.OrderSelect = {
   },
   orderProduct: {
     select: {
-      packageType: true,
+      id: true,
+      uuid: true,
       serviceType: true,
+      packageType: true,
+      deviceId: true,
       quantity: true,
       name: true,
       price: true,
@@ -119,6 +128,11 @@ export const selectGeneralTrackOrder: Prisma.OrderSelect = {
   status: true,
   orderProduct: {
     select: {
+      id: true,
+      uuid: true,
+      serviceType: true,
+      packageType: true,
+      deviceId: true,
       quantity: true,
       name: true,
       price: true,
@@ -171,6 +185,11 @@ export const selectTrackIdAndStatus: Prisma.OrderSelect = {
   paymentMethod: true,
   orderProduct: {
     select: {
+      id: true,
+      uuid: true,
+      serviceType: true,
+      packageType: true,
+      deviceId: true,
       name: true,
       price: true,
       quantity: true,
@@ -227,6 +246,11 @@ export const selectOrderByUuid: Prisma.OrderSelect = {
   },
   orderProduct: {
     select: {
+      id: true,
+      uuid: true,
+      serviceType: true,
+      packageType: true,
+      deviceId: true,
       name: true,
       quantity: true,
       price: true,
