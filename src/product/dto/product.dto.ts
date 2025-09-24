@@ -97,9 +97,9 @@ export class CreateProductDto {
   @IsNotEmpty()
   price: number;
 
-  @IsNumber()
+  @IsString()
   @IsOptional()
-  rating: number;
+  rating: string;
 
   @IsOptional()
   @IsNumber()

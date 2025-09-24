@@ -138,7 +138,7 @@ export class ProductService {
                   serviceType,
                   isActive: parseFormBoolean(dto.isActive),
                   isHide: parseFormBoolean(dto.isHide),
-                  rating: dto.rating ?? null,
+                  rating: parseFloat(dto.rating ?? '0'),
                   type: typeConnect,
                   model: modelConnect,
                   capacity: capacityConnect,
@@ -165,7 +165,7 @@ export class ProductService {
                 serviceType,
                 isActive: parseFormBoolean(dto.isActive),
                 isHide: parseFormBoolean(dto.isHide),
-                rating: dto.rating ?? null,
+                rating: parseFloat(dto.rating ?? '0'),
                 type: typeConnect,
                 model: modelConnect,
                 capacity: capacityConnect,
@@ -230,7 +230,7 @@ export class ProductService {
                 isActive: parseFormBoolean(dto.isActive),
                 isHide: parseFormBoolean(dto.isHide),
                 price: finalPrice,
-                rating: dto.rating ?? null,
+                rating: parseFloat(dto.rating ?? '0'),
                 bundleImage:
                   (bundleImageRows?.length ?? 0) > 0
                     ? { create: bundleImageRows }
@@ -296,6 +296,8 @@ export class ProductService {
         productVariant: true,
       },
     });
+
+    console.log('rating', dto.rating);
 
     const existingBundle = !existingProduct
       ? await this.prisma.bundle.findUnique({
@@ -460,7 +462,7 @@ export class ProductService {
             description: dto.description ?? undefined,
             price: dto.price ?? undefined,
             salePrice: dto.salePrice ?? undefined,
-            rating: dto.rating ?? undefined,
+            rating: parseFloat(dto.rating ?? '0'),
             isActive: parseFormBoolean(dto.isActive),
             isHide: parseFormBoolean(dto.isHide),
             serviceType: dto.serviceType ?? undefined,
@@ -559,7 +561,7 @@ export class ProductService {
               isActive: parseFormBoolean(dto.isActive),
               isHide: parseFormBoolean(dto.isHide),
               price: typeof newPrice === 'number' ? newPrice : undefined,
-              rating: dto.rating ?? undefined,
+              rating: parseFloat(dto.rating ?? '0'),
               bundleImage:
                 (bundleImageRows?.length ?? 0) > 0
                   ? { create: bundleImageRows }
