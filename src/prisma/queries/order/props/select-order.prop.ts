@@ -276,3 +276,38 @@ export const selectOrderByUuid: Prisma.OrderSelect = {
   email: true,
   updatedAt: true,
 };
+
+export const selectGeneralTrackOrderUuid: Prisma.OrderSelect = {
+  id: true,
+  name: true,
+  voucherId: true,
+  exchangePoint: true,
+  customerId: true,
+  paymentMethod: true,
+  uuid: true,
+  trackId: true,
+  createdAt: true,
+  status: true,
+  recipientAddress: true,
+  orderAddress: true,
+  orderProduct: {
+    select: {
+      id: true,
+      uuid: true,
+      serviceType: true,
+      packageType: true,
+      deviceId: true,
+      quantity: true,
+      name: true,
+      price: true,
+      orderProductImage: {
+        select: {
+          uuid: true,
+          url: true,
+        },
+      },
+    },
+  },
+  totalPayment: true,
+  expiredAt: true,
+};
