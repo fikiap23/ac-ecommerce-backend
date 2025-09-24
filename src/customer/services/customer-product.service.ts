@@ -16,7 +16,8 @@ import {
   selectCustomerProductForUpdate,
 } from 'src/prisma/queries/customer/props/select-customer-product.prop';
 import { ProductVariantRepository } from 'src/product/repositories/product-variant.repository';
-import { ProductVariant } from '@prisma/client';
+import { ISelectGeneralBundle } from '../interfaces/customer-product.interface';
+import { Prisma, ProductVariant } from '@prisma/client';
 
 @Injectable()
 export class CustomerProductService {
@@ -32,73 +33,74 @@ export class CustomerProductService {
       uuid: sub,
     });
 
-    const entity = await this.productRepository.getThrowProductOrBundleByUuid({
-      uuid: dto.productUuid,
+    const isBundleDto = !!dto.bundleUuid;
+    const lookupUuid = isBundleDto ? dto.bundleUuid! : dto.productUuid;
+
+    let entity = await this.productRepository.getThrowProductOrBundleByUuid({
+      uuid: lookupUuid,
       selectProduct: selectProductForCreateCustomerProduct,
       selectBundle: selectGenerealBundle,
     });
 
     const isBundleEntity = (e: any) =>
       !!e && (e.recordType === 'BUNDLE' || 'items' in e || 'bundleImage' in e);
-    const isProductEntity = (e: any) => !!e && !isBundleEntity(e); // sisanya anggap product
+    const isProductEntity = (e: any) => !!e && !isBundleEntity(e);
 
-    const forceProductByDto = !!dto.productVariantUuid;
-
-    // ==== PRODUCT FLOW ====
-    if (forceProductByDto || isProductEntity(entity)) {
-      if (!dto.productVariantUuid) {
+    // ===================== PRODUCT FLOW =====================
+    if (!isBundleDto || isProductEntity(entity)) {
+      if (!dto.productUuid) {
         throw new CustomError({
-          message: 'Product variant wajib diisi',
+          message: 'Product UUID wajib diisi untuk item produk',
           statusCode: 400,
         });
       }
-
-      const productVariant = await this.productVariantRepository.getThrowByUuid(
-        {
+      let productVariant: ProductVariant;
+      if (dto.productVariantUuid) {
+        productVariant = await this.productVariantRepository.getThrowByUuid({
           uuid: dto.productVariantUuid,
-        },
-      );
-
-      if (Number(productVariant.stock ?? 0) < dto.quantity) {
-        throw new CustomError({
-          message: 'Stok tidak mencukupi',
-          statusCode: 400,
         });
-      }
+        if (Number(productVariant.stock ?? 0) < dto.quantity) {
+          throw new CustomError({
+            message: 'Stok tidak mencukupi',
+            statusCode: 400,
+          });
+        }
 
-      // Cek duplikasi di cart: product + variant sama
-      const dup = await this.customerProductRepository.getMany({
-        where: {
-          customerId: customer.id,
-          productId: entity.id,
-          productVariantId: productVariant.id,
-        },
-      });
-      if (dup.length) {
-        throw new CustomError({
-          message: 'Produk sudah ada di keranjang',
-          statusCode: 400,
+        const dup = await this.customerProductRepository.getMany({
+          where: {
+            customerId: customer.id,
+            productId: entity.id,
+            productVariantId: productVariant.id,
+          },
         });
+        if (dup.length) {
+          throw new CustomError({
+            message: 'Produk sudah ada di keranjang',
+            statusCode: 400,
+          });
+        }
       }
 
       return await this.customerProductRepository.create({
         data: {
           customer: { connect: { id: customer.id } },
           product: { connect: { id: entity.id } },
-          productVariant: { connect: { id: productVariant.id } },
+          ...(productVariant && {
+            productVariant: { connect: { id: productVariant.id } },
+          }),
           quantity: dto.quantity,
           deviceId: dto.deviceId,
         },
       });
     }
 
-    // ==== BUNDLE FLOW ====
-    if (isBundleEntity(entity)) {
+    // ===================== BUNDLE FLOW =====================
+    if (isBundleDto || isBundleEntity(entity)) {
+      const bundle = entity as ISelectGeneralBundle;
+
+      // 1) Cek duplikasi bundle di cart
       const dup = await this.customerProductRepository.getMany({
-        where: {
-          customerId: customer.id,
-          bundleId: entity.id,
-        },
+        where: { customerId: customer.id, bundleId: entity.id },
       });
       if (dup.length) {
         throw new CustomError({
@@ -107,21 +109,109 @@ export class CustomerProductService {
         });
       }
 
+      // 2) VALIDASI produk & varian di dalam bundle
+      const productsInDto = dto.productBundles ?? [];
+      const bundleItems = Array.isArray(bundle.items) ? bundle.items : [];
+
+      const bundleProductMap = new Map<string, any>(
+        bundleItems
+          .filter((bi: any) => bi?.product?.uuid)
+          .map((bi: any) => [bi.product.uuid as string, bi.product]),
+      );
+
+      const hasAnyVariant = bundleItems.some(
+        (bi: any) => (bi?.product?.productVariant?.length ?? 0) > 0,
+      );
+      if (hasAnyVariant && productsInDto.length === 0) {
+        throw new CustomError({
+          message:
+            'Bundle ini memiliki produk dengan varian. Sertakan "products" dengan { uuid, variantUuid } untuk setiap produk bervarian.',
+          statusCode: 400,
+        });
+      }
+
+      const seen = new Set<string>();
+      const createCustomerProductBundle: Prisma.CustomerProductBundleCreateWithoutCustomerProductInput[] =
+        [];
+      for (const p of productsInDto) {
+        if (!p?.uuid) {
+          throw new CustomError({
+            message: 'Produk dalam bundle wajib memiliki uuid',
+            statusCode: 400,
+          });
+        }
+        if (seen.has(p.uuid)) {
+          throw new CustomError({
+            message: `Produk ${p.uuid} terduplikasi dalam payload bundle`,
+            statusCode: 400,
+          });
+        }
+        seen.add(p.uuid);
+
+        const baseProduct = bundleProductMap.get(p.uuid);
+        if (!baseProduct) {
+          throw new CustomError({
+            message: `Produk ${p.uuid} tidak termasuk dalam bundle ini`,
+            statusCode: 400,
+          });
+        }
+
+        const variants = Array.isArray(baseProduct.productVariant)
+          ? baseProduct.productVariant
+          : [];
+
+        if (variants.length > 0) {
+          if (!p.variantUuid) {
+            throw new CustomError({
+              message: `Varian wajib dipilih untuk produk ${baseProduct.name} di dalam bundle`,
+              statusCode: 400,
+            });
+          }
+
+          const variant = variants.find((v: any) => v.uuid === p.variantUuid);
+          if (!variant) {
+            throw new CustomError({
+              message: `Varian ${p.variantUuid} tidak ditemukan untuk produk ${baseProduct.name}`,
+              statusCode: 404,
+            });
+          }
+
+          const needQty = Number(dto.quantity ?? 1);
+          const stock = Number(variant.stock ?? Infinity);
+          if (isFinite(stock) && stock < needQty) {
+            throw new CustomError({
+              message: `Stok varian ${variant.name} pada produk ${baseProduct.name} tidak mencukupi`,
+              statusCode: 400,
+            });
+          }
+        } else {
+          if (p.variantUuid) {
+            throw new CustomError({
+              message: `Produk ${baseProduct.name} tidak memiliki varian, jangan kirim variantUuid`,
+              statusCode: 400,
+            });
+          }
+        }
+
+        createCustomerProductBundle.push({
+          product: { connect: { uuid: p.uuid } },
+          ...(p.variantUuid && {
+            productVariant: { connect: { uuid: p.variantUuid } },
+          }),
+        });
+      }
+
+      // 3) Lolos semua validasi → create cart item bundle
       return await this.customerProductRepository.create({
         data: {
           customer: { connect: { id: customer.id } },
-          bundle: { connect: { id: entity.id } },
+          bundle: { connect: { id: bundle.id } },
+          customerProductBundle: { create: createCustomerProductBundle },
           quantity: dto.quantity,
           deviceId: dto.deviceId,
         },
       });
     }
-
-    // Fallback tak dikenal
-    throw new CustomError({
-      message: 'Item tidak dikenali (bukan product atau bundle)',
-      statusCode: 400,
-    });
   }
 
   async getMany(sub: string) {

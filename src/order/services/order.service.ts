@@ -162,12 +162,17 @@ export class OrderService {
     );
 
     // 4. PARALLEL VALIDATION & CALCULATION
+    const minusPrice = bundles.reduce((acc, b) => acc + b.minusPrice, 0);
     const [_, subTotalPay] = await Promise.all([
       this.orderValidateRepository.validateProductsWithVariants(
         allCarts,
         allProducts,
       ),
-      this.orderRepository.calculateTotalAmount(allCarts, allProducts),
+      this.orderRepository.calculateTotalAmount(
+        allCarts,
+        allProducts,
+        minusPrice,
+      ),
     ]);
 
     this.orderValidateRepository.validatePaymentMethod(

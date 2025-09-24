@@ -105,8 +105,23 @@ model CustomerProduct {
   productVariant   ProductVariant? @relation(fields: [productVariantId], references: [id])
   productVariantId Int?
 
-  bundleId Int?
-  bundle   Bundle? @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  bundleId              Int?
+  bundle                Bundle?                 @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  customerProductBundle CustomerProductBundle[]
+}
+
+model CustomerProductBundle {
+  id               Int             @id @default(autoincrement())
+  uuid             String          @unique @default(uuid())
+  product          Product?        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId        Int?
+  productVariant   ProductVariant? @relation(fields: [productVariantId], references: [id])
+  productVariantId Int?
+
+  customerProductId Int
+  customerProduct   CustomerProduct @relation(fields: [customerProductId], references: [id], onDelete: Cascade)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 }
 
 model CustomerAddress {
@@ -215,11 +230,12 @@ model Product {
   categoryProductId Int?
   categoryProduct   CategoryProduct? @relation(fields: [categoryProductId], references: [id], onDelete: Cascade)
 
-  productBundleItems ProductBundleItem[]
-  customerProduct    CustomerProduct[]
-  productVariant     ProductVariant[]
-  productImage       ProductImage[]
-  productVoucer      ProductVoucer[]
+  productBundleItems    ProductBundleItem[]
+  customerProduct       CustomerProduct[]
+  productVariant        ProductVariant[]
+  productImage          ProductImage[]
+  productVoucer         ProductVoucer[]
+  customerProductBundle CustomerProductBundle[]
 }
 
 model Type {
@@ -308,8 +324,9 @@ model ProductVariant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  product         Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
-  customerProduct CustomerProduct[]
+  product               Product                 @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customerProduct       CustomerProduct[]
+  customerProductBundle CustomerProductBundle[]
 }
 
 model ProductImage {

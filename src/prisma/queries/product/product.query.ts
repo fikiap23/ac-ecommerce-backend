@@ -83,11 +83,10 @@ export class ProductQuery extends PrismaService {
       prisma.bundle.findMany({
         where: {
           deletedAt: null,
-          isActive: true,
           isHide: false,
           items: {
             every: {
-              product: { deletedAt: null, isActive: true },
+              product: { deletedAt: null },
             },
           },
         },
@@ -107,6 +106,7 @@ export class ProductQuery extends PrismaService {
                   name: true,
                   price: true,
                   productImage: { select: { url: true } },
+                  productVariant: true,
                 },
               },
             },

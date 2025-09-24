@@ -33,6 +33,7 @@ export class OrderRepository {
         regularPrice: number;
       }[];
     })[],
+    minusPrice?: number,
   ): Promise<number> {
     const entityMap = new Map(entities.map((e) => [e.uuid, e]));
     let totalAmount = 0;
@@ -79,6 +80,7 @@ export class OrderRepository {
         }
 
         totalAmount += Number(priceToUse) * cart.quantity;
+        totalAmount -= minusPrice ?? 0;
         continue;
       }
 
@@ -99,6 +101,7 @@ export class OrderRepository {
       }
 
       totalAmount += Number(bundlePrice) * cart.quantity;
+      totalAmount -= minusPrice ?? 0;
     }
 
     return totalAmount;
