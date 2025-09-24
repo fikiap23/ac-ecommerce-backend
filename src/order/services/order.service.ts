@@ -38,6 +38,7 @@ import {
   selectGeneralListOrders,
   selectGeneralOrder,
   selectGeneralTrackOrder,
+  selectGeneralTrackOrderUuid,
   selectOrderByUuid,
   selectOrderCreate,
   selectTrackIdAndStatus,
@@ -1016,7 +1017,7 @@ export class OrderService {
   async getOrderByTrackId(trackId: string) {
     let order = await this.orderRepository.getThrowByTrackId({
       trackId,
-      select: selectGeneralTrackOrder,
+      select: selectGeneralTrackOrderUuid,
     });
 
     if (order.expiredAt && order.expiredAt < new Date()) {
