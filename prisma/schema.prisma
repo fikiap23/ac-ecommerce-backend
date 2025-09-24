@@ -104,6 +104,9 @@ model CustomerProduct {
   productId        Int?
   productVariant   ProductVariant? @relation(fields: [productVariantId], references: [id])
   productVariantId Int?
+
+  bundleId Int?
+  bundle   Bundle? @relation(fields: [bundleId], references: [id], onDelete: Cascade)
 }
 
 model CustomerAddress {
@@ -262,8 +265,10 @@ model Bundle {
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
 
-  items       ProductBundleItem[]
-  bundleImage BundleImage[]
+  items           ProductBundleItem[]
+  bundleImage     BundleImage[]
+  customerProduct CustomerProduct[]
+  orderProduct    OrderProduct[]
 }
 
 model BundleImage {
@@ -436,7 +441,7 @@ model OrderProduct {
   model       String?
   capacity    String?
   price       Int
-  category    String
+  category    String?
   quantity    Int
   discount    Int
   createdAt   DateTime            @default(now())
@@ -450,6 +455,30 @@ model OrderProduct {
 
   order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderId Int
+
+  bundleId         Int?
+  bundle           Bundle?           @relation(fields: [bundleId], references: [id], onDelete: SetNull)
+  orderBundleItems OrderBundleItem[]
+}
+
+model OrderBundleItem {
+  id           Int     @id @default(autoincrement())
+  uuid         String  @unique @default(uuid())
+  productId    Int?
+  productUuid  String?
+  productName  String
+  productPrice Int
+
+  itemQuantity Int @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orderProduct   OrderProduct @relation(fields: [orderProductId], references: [id], onDelete: Cascade)
+  orderProductId Int
+
+  @@index([orderProductId])
+  @@index([productId])
 }
 
 model OrderProductImage {

@@ -47,10 +47,14 @@ export class ShippingAddressDto {
   details?: string;
 }
 
-export class CartDto {
+export class CartItemDto {
   @IsString()
-  @IsNotEmpty()
-  productUuid: string;
+  @IsOptional()
+  productUuid?: string;
+
+  @IsString()
+  @IsOptional()
+  bundleUuid?: string;
 
   @IsNumber()
   @IsNotEmpty()
@@ -63,6 +67,10 @@ export class CartDto {
   @IsString()
   @IsOptional()
   deviceId?: string;
+
+  @IsEnum(['PRODUCT', 'BUNDLE'])
+  @IsNotEmpty()
+  type: 'PRODUCT' | 'BUNDLE';
 }
 
 export class CreateOrderDto {
@@ -90,9 +98,9 @@ export class CreateOrderDto {
   recipientAddress: ShippingAddressDto;
 
   @ValidateNested({ each: true })
-  @Type(() => CartDto)
+  @Type(() => CartItemDto)
   @IsNotEmpty()
-  carts: CartDto[];
+  carts: CartItemDto[];
 
   @IsString()
   @IsNotEmpty()
@@ -104,7 +112,7 @@ export class CreateOrderDto {
 
   @IsString()
   @IsOptional()
-  voucherUuid: string;
+  voucherUuid?: string;
 
   @IsNumber()
   @IsNotEmpty()
@@ -112,7 +120,7 @@ export class CreateOrderDto {
 
   @IsNumber()
   @IsOptional()
-  voucherDiscount: number;
+  voucherDiscount?: number;
 
   @IsNumber()
   @IsNotEmpty()

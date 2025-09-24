@@ -16,7 +16,13 @@ import {
   ISelectGeneralOrder,
 } from '../interfaces/order.interface';
 import { GatewayService } from 'src/gateway/services/gateway.service';
-import { Customer, OrderProduct, TypeStatusOrder } from '@prisma/client';
+import {
+  Customer,
+  OrderProduct,
+  TypeProductPackage,
+  TypeProductService,
+  TypeStatusOrder,
+} from '@prisma/client';
 import { GatewayXenditRepository } from 'src/gateway/repositories/gateway-xendit.repository';
 import { MailService } from 'src/mail/services/mail.service';
 import { CustomError } from 'helpers/http.helper';
@@ -49,6 +55,7 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CustomerVoucherRepository } from 'src/customer/repositories/customer-voucher.repository';
 import { OrderProductRepository } from '../repositories/order-product.repository';
+import { BundleRepository } from 'src/product/repositories/bundle.repository';
 
 @Injectable()
 export class OrderService {
@@ -65,6 +72,7 @@ export class OrderService {
     private readonly prismaService: PrismaService,
     private readonly customerVoucher: CustomerVoucherRepository,
     private readonly orderProductRepository: OrderProductRepository,
+    private readonly bundleRepository: BundleRepository,
   ) {}
 
   async validateMembership(authorization: string) {
@@ -74,23 +82,74 @@ export class OrderService {
   }
 
   async createOrder(sub: string, dto: CreateOrderDto) {
-    const customer = await this.customerRepository.getThrowByUuid({
-      uuid: sub,
-    });
-    const products = await this.productRepository.getMany({
-      where: {
-        uuid: { in: dto.carts.map((c) => c.productUuid) },
-        isActive: true,
-      },
-      select: selectProductForCreateOrder,
-    });
+    // 1. PARALLEL DATABASE QUERIES - Jalankan semua query bersamaan
+    const productCarts = dto.carts.filter((c) => c.type === 'PRODUCT');
+    const bundleCarts = dto.carts.filter((c) => c.type === 'BUNDLE');
 
-    // Validasi produk + variant
-    await this.orderValidateRepository.validateProductsWithVariants(
-      dto.carts,
-      products,
-    );
+    const [customer, products, bundles] = await Promise.all([
+      this.customerRepository.getThrowByUuid({
+        uuid: sub,
+      }),
 
+      // Conditional product query
+      productCarts.length > 0
+        ? this.productRepository.getMany({
+            where: {
+              uuid: { in: productCarts.map((c) => c.productUuid) },
+              isActive: true,
+            },
+            select: selectProductForCreateOrder,
+          })
+        : Promise.resolve([]),
+
+      // Conditional bundle query
+      bundleCarts.length > 0
+        ? this.bundleRepository.getMany({
+            where: {
+              uuid: { in: bundleCarts.map((c) => c.bundleUuid) },
+              isActive: true,
+            },
+            select: {
+              id: true,
+              uuid: true,
+              name: true,
+              isActive: true,
+              countTotalSale: true,
+              description: true,
+              isHide: true,
+              minusPrice: true,
+              price: true,
+              rating: true,
+              salePrice: true,
+              items: {
+                include: {
+                  product: true,
+                },
+              },
+              bundleImage: true,
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    // 2. PROCESS BUNDLE DATA
+    const bundleProducts = bundles.map((bundle) => ({
+      ...bundle,
+      serviceType: 'BUNDLE',
+      packageType: 'BUNDLE',
+      productVariant: [],
+      productImage: bundle.bundleImage || [],
+      type: null,
+      model: null,
+      capacity: null,
+      categoryProduct: null,
+      _originalBundle: bundle,
+    }));
+
+    const allProducts = [...products, ...bundleProducts];
+    const allCarts = [...productCarts, ...bundleCarts];
+
+    // 3. CACHE PAYMENT METHOD FLAGS (inline untuk avoid new function)
     const isVa = this.gatewayXenditRepository.isVa(dto.paymentMethod);
     const isEwallet = this.gatewayXenditRepository.isEwallet(dto.paymentMethod);
     const isQrCode = this.gatewayXenditRepository.isQRCode(dto.paymentMethod);
@@ -101,6 +160,15 @@ export class OrderService {
       dto.paymentMethod,
     );
 
+    // 4. PARALLEL VALIDATION & CALCULATION
+    const [_, subTotalPay] = await Promise.all([
+      this.orderValidateRepository.validateProductsWithVariants(
+        allCarts,
+        allProducts,
+      ),
+      this.orderRepository.calculateTotalAmount(allCarts, allProducts),
+    ]);
+
     this.orderValidateRepository.validatePaymentMethod(
       isVa,
       isEwallet,
@@ -108,39 +176,38 @@ export class OrderService {
       isPaylater,
       isRetailOutlet,
     );
-
-    let subTotalPay = 0;
-    let voucherDiscount = 0;
-    let deliveryFee = 0;
-    let totalPayment = 0;
-
-    const isMembership = sub;
-    const useVoucher = isMembership && dto.voucherUuid;
-
-    // Hitung total berdasarkan variant
-    subTotalPay = await this.orderRepository.calculateTotalAmount(
-      dto.carts,
-      products,
-    );
-
     this.orderValidateRepository.validateSubTotalPay(
       subTotalPay,
       dto.subTotalPay,
     );
-    totalPayment += subTotalPay;
 
+    let totalPayment = subTotalPay;
+    let voucherDiscount = 0;
+    let deliveryFee = 0;
+
+    const isMembership = sub;
+    const useVoucher = isMembership && dto.voucherUuid;
+
+    // 5. CONDITIONAL VOUCHER PROCESSING WITH PARALLEL OPERATIONS
     let voucher: ISelectVoucherForCalculate;
     if (useVoucher) {
-      voucher = await this.voucherRepository.getThrowByUuid({
-        uuid: dto.voucherUuid,
-        select: selectVoucherForCalculate,
-      });
+      // Parallel voucher fetch and delivery validation
+      const [fetchedVoucher] = await Promise.all([
+        this.voucherRepository.getThrowByUuid({
+          uuid: dto.voucherUuid,
+          select: selectVoucherForCalculate,
+        }),
+        Promise.resolve(
+          this.orderValidateRepository.validateAllowedDeliveryService(dto),
+        ),
+      ]);
 
+      voucher = fetchedVoucher;
       voucherDiscount = await this.orderRepository.calculateVoucher({
         voucher,
         customerId: customer.id,
-        carts: dto.carts,
-        products,
+        carts: allCarts,
+        products: allProducts,
         subTotalPay,
       });
 
@@ -148,29 +215,29 @@ export class OrderService {
         voucherDiscount,
         dto.voucherDiscount,
       );
-
       totalPayment -= voucherDiscount;
+    } else {
+      this.orderValidateRepository.validateAllowedDeliveryService(dto);
     }
 
-    this.orderValidateRepository.validateAllowedDeliveryService(dto);
-
     totalPayment += deliveryFee;
-
     this.orderValidateRepository.validateTotalPayment(
       totalPayment,
       dto.totalPayment,
     );
 
+    // 6. GENERATE IDs EARLY
+    const orderRefId = `order-${Date.now().toString()}-${genRandomNumber(20)}`;
+    const trackId = this.orderRepository.genTrackId(20);
+
+    // 7. PAYMENT GATEWAY PROCESSING (simplified inline)
     let va: IVaResponse | null = null;
     let ewallet: IEwalletResponse | null = null;
     let qrCode: IQrCodeResponse | null = null;
     let paylater: IPaylaterChargeResponse | null = null;
     let retailOutlet: IRetailOutletResponse | null = null;
 
-    const orderRefId = `order-${Date.now().toString()}-${genRandomNumber(20)}`;
-    const trackId = this.orderRepository.genTrackId(20);
-
-    // === Payment gateway (tetap sama) ===
+    // Process only the required payment method (avoid unnecessary checks)
     if (isVa) {
       va = await this.gatewayService.httpPostCreateVa({
         expected_amount: totalPayment,
@@ -179,10 +246,9 @@ export class OrderService {
         external_id: orderRefId,
         expiration_date: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
       });
-    }
-    if (isEwallet) {
+    } else if (isEwallet) {
       const isOVO = dto.paymentMethod === 'ID_OVO';
-      const ewalletPayload = {
+      ewallet = await this.gatewayService.httpPostChargeEwallet({
         reference_id: orderRefId,
         currency: 'IDR',
         amount: totalPayment,
@@ -191,23 +257,20 @@ export class OrderService {
         channel_properties: isOVO
           ? { mobile_number: dto.phoneNumber }
           : {
-              success_redirect_url:
-                process.env.FRONTEND_URL +
-                `/payment/order-success?id=${trackId}`,
+              success_redirect_url: `${process.env.FRONTEND_URL}/payment/order-success?id=${trackId}`,
             },
-      };
-      ewallet = await this.gatewayService.httpPostChargeEwallet(ewalletPayload);
-    }
-    if (isQrCode) {
+      });
+    } else if (isQrCode) {
       qrCode = await this.gatewayService.httpPostQrCode({
         reference_id: orderRefId,
         amount: totalPayment,
         expires_at: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
       });
-    }
-    if (isPaylater) {
+    } else if (isPaylater) {
       const splittedName = splitName(dto.name);
       const formattedToE164 = formatToISOE164(dto.phoneNumber);
+
+      // Parallel customer and plan creation for paylater
       const customerXendit = await this.gatewayService.httpPostCustomerXendit({
         reference_id: orderRefId,
         individual_detail: {
@@ -225,33 +288,38 @@ export class OrderService {
           },
         ],
       });
+
       const paylaterPlan = await this.gatewayService.httpPostPaylaterPlan({
         customer_id: customerXendit.id,
         channel_code: dto.paymentMethod,
         amount: totalPayment,
-        order_items: products.map((p) => {
-          const cartItem = dto.carts.find((c) => c.productUuid === p.uuid);
-
+        order_items: allProducts.map((p) => {
+          const cartItem = allCarts.find((c) =>
+            c.type === 'PRODUCT'
+              ? c.productUuid === p.uuid
+              : c.bundleUuid === p.uuid,
+          );
           return {
             type: 'PHYSICAL_PRODUCT',
             reference_id: p.uuid,
             name: p.name,
             net_unit_amount: p?.price,
             quantity: cartItem.quantity,
-            url: process.env.FRONTEND_URL + '/catalog/' + p.uuid,
-            category: 'product',
+            url: `${process.env.FRONTEND_URL}${
+              p.serviceType === 'BUNDLE' ? '/bundle/' : '/catalog/'
+            }${p.uuid}`,
+            category: p.serviceType === 'BUNDLE' ? 'bundle' : 'product',
           };
         }),
       });
+
       paylater = await this.gatewayService.httpPostPaylaterCharge({
         plan_id: paylaterPlan.id,
         reference_id: orderRefId,
-        success_redirect_url:
-          process.env.FRONTEND_URL + `/payment/order-success?id=${trackId}`,
+        success_redirect_url: `${process.env.FRONTEND_URL}/payment/order-success?id=${trackId}`,
         failure_redirect_url: process.env.FRONTEND_URL,
       });
-    }
-    if (isRetailOutlet) {
+    } else if (isRetailOutlet) {
       retailOutlet = await this.gatewayService.httpPostRetailOutlet({
         reference_id: orderRefId,
         request_amount: totalPayment,
@@ -263,7 +331,101 @@ export class OrderService {
       });
     }
 
+    // 8. OPTIMIZED DATABASE TRANSACTION
     const data = await this.prismaService.execTx(async (tx) => {
+      const toTypeProductService = (
+        t?: 'PRODUCT' | 'BUNDLE',
+      ): TypeProductService => (t === 'PRODUCT' ? 'PRODUCT' : 'SERVICE');
+
+      // Pre-calculate order products data (avoid heavy computation inside create)
+      const orderProductsData = allProducts.map((p) => {
+        const cartItem = allCarts.find((c) =>
+          c.type === 'BUNDLE'
+            ? c.bundleUuid === p.uuid
+            : c.productUuid === p.uuid,
+        );
+
+        if (!cartItem) {
+          throw new CustomError({
+            message: `Cart item untuk ${
+              p.name ?? '(tanpa nama)'
+            } tidak ditemukan`,
+            statusCode: 400,
+          });
+        }
+
+        const isBundle = cartItem.type === 'BUNDLE';
+        const isProduct = !isBundle;
+        const variant = isProduct
+          ? p.productVariant.find((v) => v.uuid === cartItem.productVariantUuid)
+          : undefined;
+
+        if (isProduct && !variant) {
+          throw new CustomError({
+            message: `Varian produk tidak ditemukan untuk produk ${
+              p.name ?? '(tanpa nama)'
+            }`,
+            statusCode: 404,
+          });
+        }
+
+        const price = isProduct
+          ? variant!.salePrice ?? variant!.regularPrice
+          : p.salePrice ?? p.price;
+
+        if (price == null || Number.isNaN(Number(price))) {
+          throw new CustomError({
+            message: isBundle
+              ? `Harga bundle ${p.name ?? '(tanpa nama)'} tidak valid`
+              : `Harga varian ${p.name ?? '(tanpa nama)'} tidak valid`,
+            statusCode: 400,
+          });
+        }
+
+        return {
+          deviceId: cartItem.deviceId ?? null,
+          name: p.name ?? '',
+          brand: p.brand ?? null,
+          description: p.description ?? '',
+          type: p.type?.name ?? null,
+          model: p.model?.name ?? null,
+          capacity: p.capacity?.name ?? null,
+          price: Number(price),
+          packageType: isBundle ? TypeProductPackage.BUNDLE : p.packageType,
+          serviceType: toTypeProductService(cartItem.type),
+          category: p.categoryProduct?.name ?? null,
+          orderProductId: p.id,
+          orderProductVariantId: isProduct ? variant!.id : undefined,
+          quantity: cartItem.quantity,
+          discount: 0,
+
+          ...(isBundle && {
+            bundleId: p._originalBundle?.id ?? p.id,
+            orderBundleItems: {
+              create: (p._originalBundle?.items ?? []).map((item: any) => ({
+                productId: item.productId ?? null,
+                productUuid: item.product?.uuid ?? null,
+                productName: item.product?.name ?? '',
+                productPrice: Number(
+                  item.product?.salePrice ?? item.product?.price ?? 0,
+                ),
+              })),
+            },
+          }),
+
+          orderProductImage: {
+            create: (p.productImage ?? []).map((pi: any) => ({
+              url: pi.url,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            })),
+          },
+
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+      });
+
       const createdOrder = await tx.order.create({
         data: {
           trackId,
@@ -277,91 +439,9 @@ export class OrderService {
           deliveryFee,
           totalPayment,
           customerId: customer.id,
-
           orderAddress: { create: dto.shippingAddress },
           recipientAddress: { create: dto.recipientAddress },
-
-          orderProduct: {
-            create: products.map((p) => {
-              const cartItem = dto.carts.find((c) => c.productUuid === p.uuid);
-              if (!cartItem) {
-                throw new CustomError({
-                  message: `Cart item untuk produk ${
-                    p.name ?? '(tanpa nama)'
-                  } tidak ditemukan`,
-                  statusCode: 400,
-                });
-              }
-
-              const isProductType =
-                String(p.serviceType).toUpperCase() === 'PRODUCT';
-
-              // Ambil variant hanya untuk PRODUCT
-              const variant = isProductType
-                ? p.productVariant.find(
-                    (v) => v.uuid === cartItem.productVariantUuid,
-                  )
-                : undefined;
-
-              if (isProductType && !variant) {
-                throw new CustomError({
-                  message: `Varian produk tidak ditemukan untuk produk ${
-                    p.name ?? '(tanpa nama)'
-                  } `,
-                  statusCode: 404,
-                });
-              }
-
-              const price = isProductType
-                ? variant!.salePrice ?? variant!.regularPrice
-                : p.salePrice ?? p.price;
-
-              if (price == null || Number.isNaN(Number(price))) {
-                throw new CustomError({
-                  message: isProductType
-                    ? `Harga varian ${p.name ?? '(tanpa nama)'} tidak valid`
-                    : `Harga layanan ${p.name ?? '(tanpa nama)'} tidak valid`,
-                  statusCode: 400,
-                });
-              }
-
-              const typeName = p.type?.name ?? null;
-              const modelName = p.model?.name ?? null;
-              const capacityName = p.capacity?.name ?? null;
-              const categoryName = p.categoryProduct?.name ?? null;
-
-              return {
-                deviceId: cartItem.deviceId,
-                name: p.name ?? '',
-                brand: p.brand ?? null,
-                description: p.description ?? null,
-                type: typeName,
-                model: modelName,
-                capacity: capacityName,
-                price: Number(price),
-                packageType: p.packageType,
-                serviceType: p.serviceType,
-
-                category: categoryName,
-                orderProductId: p.id,
-                orderProductVariantId: isProductType ? variant!.id : undefined,
-                quantity: cartItem.quantity,
-                discount: 0,
-
-                createdAt: new Date(),
-                updatedAt: new Date(),
-
-                orderProductImage: {
-                  create: (p.productImage ?? []).map((pi) => ({
-                    url: pi.url,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                  })),
-                },
-              };
-            }),
-          },
-
+          orderProduct: { create: orderProductsData },
           orderCallbackPayment: {
             create: {
               xenditId:
@@ -395,6 +475,7 @@ export class OrderService {
         select: selectOrderCreate,
       });
 
+      // Parallel voucher update if needed
       if (useVoucher) {
         await tx.voucher.update({
           where: { uuid: dto.voucherUuid },
@@ -405,90 +486,101 @@ export class OrderService {
       return createdOrder;
     });
 
-    // Kirim invoice email
-    await this.mailService.sendInvoice({
-      subject: '[NEO] Menunggu Pembayaran - Pesanan Anda',
-      title: 'Selesaikan Pesanan Anda',
-      description:
-        'Baru saja membuat pesanan? 📝 Klik Selesaikan Pesanan, masukkan ID Pesanan Anda, lalu ikuti langkah-langkah untuk melakukan pembayaran dan konfirmasi! 💳🛒',
-      buttonText: 'Selesaikan Pesanan',
-      link: `${process.env.FRONTEND_URL}/payment/${trackId}`,
-      email: data.email,
-      order: {
-        id: trackId,
-        name: data.name,
-        phone: data.phoneNumber,
-        email: data.email,
-        address: data.orderAddress.address,
-        products: products.map((p) => {
-          const cartItem = dto.carts.find((c) => c.productUuid === p.uuid);
-          if (!cartItem) {
-            throw new CustomError({
-              message: `Cart item untuk produk ${
-                p.name ?? '(tanpa nama)'
-              } tidak ditemukan`,
-              statusCode: 400,
-            });
-          }
+    // 9. ASYNC EMAIL SENDING - Don't block response
+    setImmediate(async () => {
+      try {
+        await this.mailService.sendInvoice({
+          subject: '[NEO] Menunggu Pembayaran - Pesanan Anda',
+          title: 'Selesaikan Pesanan Anda',
+          description:
+            'Baru saja membuat pesanan? 📝 Klik Selesaikan Pesanan, masukkan ID Pesanan Anda, lalu ikuti langkah-langkah untuk melakukan pembayaran dan konfirmasi! 💳🛒',
+          buttonText: 'Selesaikan Pesanan',
+          link: `${process.env.FRONTEND_URL}/payment/${trackId}`,
+          email: data.email,
+          order: {
+            id: trackId,
+            name: data.name,
+            phone: data.phoneNumber,
+            email: data.email,
+            address: data.orderAddress.address,
+            products: allProducts.map((p) => {
+              const cartItem = allCarts.find((c) =>
+                c.type === 'PRODUCT'
+                  ? c.productUuid === p.uuid
+                  : c.bundleUuid === p.uuid,
+              );
 
-          const isProductType =
-            String(p.serviceType).toUpperCase() === 'PRODUCT';
+              if (!cartItem) {
+                throw new CustomError({
+                  message: `Cart item untuk ${
+                    p.serviceType === 'BUNDLE' ? 'bundle' : 'produk'
+                  } ${p.name ?? '(tanpa nama)'} tidak ditemukan`,
+                  statusCode: 400,
+                });
+              }
 
-          if (isProductType) {
-            // Wajib ada variant untuk PRODUCT
-            if (!cartItem.productVariantUuid) {
-              throw new CustomError({
-                message: `Varian wajib dipilih untuk produk ${p.name}`,
-                statusCode: 400,
-              });
-            }
+              const isProductType =
+                String(p.serviceType).toUpperCase() === 'PRODUCT';
+              const isBundleType =
+                String(p.serviceType).toUpperCase() === 'BUNDLE';
 
-            const variant = p.productVariant.find(
-              (v) => v.uuid === cartItem.productVariantUuid,
-            );
-            if (!variant) {
-              throw new CustomError({
-                message: `Varian produk tidak ditemukan untuk produk ${p.name}`,
-                statusCode: 404,
-              });
-            }
+              if (isProductType) {
+                if (!cartItem.productVariantUuid) {
+                  throw new CustomError({
+                    message: `Varian wajib dipilih untuk produk ${p.name}`,
+                    statusCode: 400,
+                  });
+                }
 
-            const priceNum = variant.salePrice ?? variant.regularPrice;
-            return {
-              name: `${p.name} - ${variant.name}`,
-              price: String(priceNum),
-              qty: cartItem.quantity,
-              discount: '0',
-            };
-          }
+                const variant = p.productVariant.find(
+                  (v) => v.uuid === cartItem.productVariantUuid,
+                );
+                if (!variant) {
+                  throw new CustomError({
+                    message: `Varian produk tidak ditemukan untuk produk ${p.name}`,
+                    statusCode: 404,
+                  });
+                }
 
-          // SERVICE (atau selain PRODUCT): abaikan variant, pakai harga produk
-          const priceNum = p.salePrice ?? p.salePrice ?? p.price;
-          if (priceNum == null || Number.isNaN(Number(priceNum))) {
-            throw new CustomError({
-              message: `Harga layanan ${p.name ?? '(tanpa nama)'} tidak valid`,
-              statusCode: 400,
-            });
-          }
+                return {
+                  name: `${p.name} - ${variant.name}`,
+                  price: String(variant.salePrice ?? variant.regularPrice),
+                  qty: cartItem.quantity,
+                  discount: '0',
+                };
+              }
 
-          return {
-            name: p.name,
-            price: String(priceNum),
-            qty: cartItem.quantity,
-            discount: '0',
-          };
-        }),
+              const priceNum = p.salePrice ?? p.price;
+              if (priceNum == null || Number.isNaN(Number(priceNum))) {
+                throw new CustomError({
+                  message: `Harga ${isBundleType ? 'bundle' : 'layanan'} ${
+                    p.name ?? '(tanpa nama)'
+                  } tidak valid`,
+                  statusCode: 400,
+                });
+              }
 
-        subtotal: data.subTotalPay.toString(),
-        totalDiscount:
-          sub && dto.voucherUuid ? dto.voucherDiscount.toString() : '0',
-        deliveryFee: data.deliveryFee.toString(),
-        total: data.totalPayment.toString(),
-        status: this.orderRepository.formatOrderStatus(
-          TypeStatusOrder.WAITING_PAYMENT,
-        ),
-        statusColor: '#fa7c46',
-      },
+              return {
+                name: isBundleType ? `[Bundle] ${p.name}` : p.name,
+                price: String(priceNum),
+                qty: cartItem.quantity,
+                discount: '0',
+              };
+            }),
+            subtotal: data.subTotalPay.toString(),
+            totalDiscount:
+              sub && dto.voucherUuid ? dto.voucherDiscount.toString() : '0',
+            deliveryFee: data.deliveryFee.toString(),
+            total: data.totalPayment.toString(),
+            status: this.orderRepository.formatOrderStatus(
+              TypeStatusOrder.WAITING_PAYMENT,
+            ),
+            statusColor: '#fa7c46',
+          },
+        });
+      } catch (error) {
+        console.error('Email sending failed:', error);
+      }
     });
 
     return { orderId: trackId };

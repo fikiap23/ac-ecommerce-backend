@@ -20,6 +20,7 @@ import { CapacityService } from './services/capacity.service';
 import { ModelController } from './controllers/model.controller';
 import { TypeController } from './controllers/type.controller';
 import { CapacityController } from './controllers/capacity.controller';
+import { BundleRepository } from './repositories/bundle.repository';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { CapacityController } from './controllers/capacity.controller';
     TypeService,
     ModelService,
     CapacityService,
+    BundleRepository,
   ],
   controllers: [
     ProductController,
@@ -62,6 +64,7 @@ import { CapacityController } from './controllers/capacity.controller';
     TypeService,
     ModelService,
     CapacityService,
+    BundleRepository,
   ],
 })
 export class ProductModule {}

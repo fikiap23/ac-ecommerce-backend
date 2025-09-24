@@ -26,7 +26,7 @@ export class OrderRepository {
 
   async calculateTotalAmount(
     carts: CreateOrderDto['carts'],
-    products: (ISelectProductForCreateOrder & {
+    entities: (ISelectProductForCreateOrder & {
       productVariant: {
         uuid: string;
         salePrice: number | null;
@@ -34,66 +34,71 @@ export class OrderRepository {
       }[];
     })[],
   ): Promise<number> {
-    const productMap = new Map(products.map((p) => [p.uuid, p]));
+    const entityMap = new Map(entities.map((e) => [e.uuid, e]));
     let totalAmount = 0;
 
-    for (const cartItem of carts) {
-      const product = productMap.get(cartItem.productUuid);
+    for (const cart of carts) {
+      const isBundle = cart.type === 'BUNDLE';
+      const idToFind = isBundle ? (cart as any).bundleUuid : cart.productUuid;
 
-      if (!product) {
+      const entity = idToFind ? entityMap.get(idToFind) : undefined;
+      if (!entity) {
         throw new CustomError({
-          message: `Produk dengan UUID ${cartItem.productUuid} tidak ditemukan`,
+          message: `${isBundle ? 'Bundle' : 'Produk'} dengan UUID ${
+            idToFind ?? '(kosong)'
+          } tidak ditemukan`,
           statusCode: 404,
         });
       }
 
-      const isProductType = product.serviceType === 'PRODUCT';
-
-      if (isProductType) {
-        // Wajib ada variant utk PRODUCT
-        if (!cartItem.productVariantUuid) {
+      if (!isBundle) {
+        // === PRODUCT ===
+        if (!cart.productVariantUuid) {
           throw new CustomError({
-            message: `Varian wajib dipilih untuk produk ${product.name}`,
+            message: `Varian wajib dipilih untuk produk ${entity.name}`,
             statusCode: 400,
           });
         }
 
-        const variant = product.productVariant.find(
-          (v) => v.uuid === cartItem.productVariantUuid,
+        const variant = entity.productVariant.find(
+          (v) => v.uuid === cart.productVariantUuid,
         );
-
         if (!variant) {
           throw new CustomError({
-            message: `Varian produk tidak ditemukan untuk produk ${product.name}`,
+            message: `Varian produk tidak ditemukan untuk produk ${entity.name}`,
             statusCode: 404,
           });
         }
 
         const priceToUse = variant.salePrice ?? variant.regularPrice;
-
         if (priceToUse == null || Number.isNaN(Number(priceToUse))) {
           throw new CustomError({
-            message: `Harga varian ${product.name} tidak valid`,
+            message: `Harga varian ${entity.name} tidak valid`,
             statusCode: 400,
           });
         }
 
-        totalAmount += Number(priceToUse) * cartItem.quantity;
-        console.log('PRODUCT');
-        console.log(totalAmount);
-        console.log(variant.salePrice, variant.regularPrice);
-      } else {
-        const priceToUse = product.salePrice ?? product.price;
-
-        if (priceToUse == null || Number.isNaN(Number(priceToUse))) {
-          throw new CustomError({
-            message: `Harga produk layanan ${product.name} tidak valid`,
-            statusCode: 400,
-          });
-        }
-
-        totalAmount += Number(priceToUse) * cartItem.quantity;
+        totalAmount += Number(priceToUse) * cart.quantity;
+        continue;
       }
+
+      // === BUNDLE ===
+      if (cart.productVariantUuid) {
+        throw new CustomError({
+          message: `Bundle tidak memerlukan varian`,
+          statusCode: 400,
+        });
+      }
+
+      const bundlePrice = entity.salePrice ?? entity.price;
+      if (bundlePrice == null || Number.isNaN(Number(bundlePrice))) {
+        throw new CustomError({
+          message: `Harga bundle ${entity.name} tidak valid`,
+          statusCode: 400,
+        });
+      }
+
+      totalAmount += Number(bundlePrice) * cart.quantity;
     }
 
     return totalAmount;

@@ -7,7 +7,10 @@ import {
 import { CustomerRepository } from '../repositories/customer.repository';
 import { ProductRepository } from 'src/product/repositories/product.repository';
 import { CustomError } from 'helpers/http.helper';
-import { selectProductForCreateCustomerProduct } from 'src/prisma/queries/product/props/select-product.prop';
+import {
+  selectGenerealBundle,
+  selectProductForCreateCustomerProduct,
+} from 'src/prisma/queries/product/props/select-product.prop';
 import {
   selectCustomerProduct,
   selectCustomerProductForUpdate,
@@ -29,54 +32,95 @@ export class CustomerProductService {
       uuid: sub,
     });
 
-    const product = await this.productRepository.getThrowByUuid({
+    const entity = await this.productRepository.getThrowProductOrBundleByUuid({
       uuid: dto.productUuid,
-      select: selectProductForCreateCustomerProduct,
+      selectProduct: selectProductForCreateCustomerProduct,
+      selectBundle: selectGenerealBundle,
     });
 
-    let productVariant: ProductVariant | null = null;
-    if (product.serviceType == 'PRODUCT') {
-      productVariant = await this.productVariantRepository.getThrowByUuid({
-        uuid: dto.productVariantUuid,
-      });
-      if (Number(productVariant.stock) < dto.quantity) {
+    const isBundleEntity = (e: any) =>
+      !!e && (e.recordType === 'BUNDLE' || 'items' in e || 'bundleImage' in e);
+    const isProductEntity = (e: any) => !!e && !isBundleEntity(e); // sisanya anggap product
+
+    const forceProductByDto = !!dto.productVariantUuid;
+
+    // ==== PRODUCT FLOW ====
+    if (forceProductByDto || isProductEntity(entity)) {
+      if (!dto.productVariantUuid) {
+        throw new CustomError({
+          message: 'Product variant wajib diisi',
+          statusCode: 400,
+        });
+      }
+
+      const productVariant = await this.productVariantRepository.getThrowByUuid(
+        {
+          uuid: dto.productVariantUuid,
+        },
+      );
+
+      if (Number(productVariant.stock ?? 0) < dto.quantity) {
         throw new CustomError({
           message: 'Stok tidak mencukupi',
           statusCode: 400,
         });
       }
-      // Cek apakah sudah ada di keranjang
-      const isInCart = await this.customerProductRepository.getMany({
+
+      // Cek duplikasi di cart: product + variant sama
+      const dup = await this.customerProductRepository.getMany({
         where: {
           customerId: customer.id,
-          productId: product.id,
-          productVariantId: productVariant?.id,
+          productId: entity.id,
+          productVariantId: productVariant.id,
         },
       });
-
-      if (isInCart.length) {
+      if (dup.length) {
         throw new CustomError({
           message: 'Produk sudah ada di keranjang',
           statusCode: 400,
         });
       }
+
+      return await this.customerProductRepository.create({
+        data: {
+          customer: { connect: { id: customer.id } },
+          product: { connect: { id: entity.id } },
+          productVariant: { connect: { id: productVariant.id } },
+          quantity: dto.quantity,
+          deviceId: dto.deviceId,
+        },
+      });
     }
 
-    // Insert ke keranjang
-    return await this.customerProductRepository.create({
-      data: {
-        customer: {
-          connect: { id: customer.id },
+    // ==== BUNDLE FLOW ====
+    if (isBundleEntity(entity)) {
+      const dup = await this.customerProductRepository.getMany({
+        where: {
+          customerId: customer.id,
+          bundleId: entity.id,
         },
-        quantity: dto.quantity,
-        deviceId: dto.deviceId,
-        product: {
-          connect: { id: product.id },
+      });
+      if (dup.length) {
+        throw new CustomError({
+          message: 'Bundle sudah ada di keranjang',
+          statusCode: 400,
+        });
+      }
+
+      return await this.customerProductRepository.create({
+        data: {
+          customer: { connect: { id: customer.id } },
+          bundle: { connect: { id: entity.id } },
+          quantity: dto.quantity,
+          deviceId: dto.deviceId,
         },
-        ...(productVariant && {
-          productVariant: { connect: { id: productVariant.id } },
-        }),
-      },
+      });
+    }
+
+    // Fallback tak dikenal
+    throw new CustomError({
+      message: 'Item tidak dikenali (bukan product atau bundle)',
+      statusCode: 400,
     });
   }
 

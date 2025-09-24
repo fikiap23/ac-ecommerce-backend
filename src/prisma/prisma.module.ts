@@ -22,6 +22,7 @@ import { TypeQuery } from './queries/type/type.query';
 import { CapacityQuery } from './queries/capacity/capacity.query';
 import { TechnicianQuery } from './queries/technician/technician.query';
 import { DriverQuery } from './queries/driver/driver.query';
+import { BundleQuery } from './queries/bundle/bundle.query';
 
 @Module({
   imports: [],
@@ -49,6 +50,7 @@ import { DriverQuery } from './queries/driver/driver.query';
     CapacityQuery,
     TechnicianQuery,
     DriverQuery,
+    BundleQuery,
   ],
   exports: [
     PrismaService,
@@ -74,6 +76,7 @@ import { DriverQuery } from './queries/driver/driver.query';
     CapacityQuery,
     TechnicianQuery,
     DriverQuery,
+    BundleQuery,
   ],
 })
 export class PrismaModule {}
