@@ -90,16 +90,14 @@ export class ProductQuery extends PrismaService {
       prisma.bundle.findMany({
         where: {
           deletedAt: null,
-          isHide: false,
+          isHide: filter?.isHide && parseFormBoolean(filter?.isHide),
+          isActive: filter?.isActive && parseFormBoolean(filter?.isActive),
           items: {
             every: {
               product: {
                 deletedAt: null,
                 ...(filter?.isActive && {
                   isActive: parseFormBoolean(filter?.isActive),
-                }),
-                ...(filter?.isHide && {
-                  isHide: parseFormBoolean(filter?.isHide),
                 }),
               },
             },
