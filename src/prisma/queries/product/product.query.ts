@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { parseFormBoolean } from 'helpers/data.helper';
 import { IPaginatedResult } from 'src/prisma/interfaces/paginated-result.interface';
 import { PaginateFunction, paginator } from 'src/prisma/paginator/paginator';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   ICreateProduct,
+  IFilterProduct,
   IUpdateProduct,
 } from 'src/product/interfaces/product.interface';
 
@@ -45,6 +47,7 @@ export class ProductQuery extends PrismaService {
   async findManyPaginateAll({
     tx,
     where,
+    filter,
     select,
     orderBy,
     page = 1,
@@ -56,6 +59,7 @@ export class ProductQuery extends PrismaService {
     orderBy?: Prisma.ProductOrderByWithRelationInput;
     page?: number;
     limit?: number;
+    filter?: IFilterProduct;
   }): Promise<IPaginatedResult<any>> {
     const prisma = tx ?? this;
 
@@ -86,7 +90,11 @@ export class ProductQuery extends PrismaService {
           isHide: false,
           items: {
             every: {
-              product: { deletedAt: null },
+              product: {
+                deletedAt: null,
+                isActive: parseFormBoolean(filter?.isActive),
+                isHide: parseFormBoolean(filter?.isHide),
+              },
             },
           },
         },

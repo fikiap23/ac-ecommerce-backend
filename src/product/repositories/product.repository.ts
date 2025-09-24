@@ -115,6 +115,7 @@ export class ProductRepository {
     return await this.productQuery.findManyPaginateAll({
       tx,
       where: combinedWhere,
+      filter,
       select,
       orderBy: { createdAt: sort },
       page,
