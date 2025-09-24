@@ -140,7 +140,35 @@ export class ProductImageData {
   url: string;
 }
 
-export class UpdateProductDto extends PartialType(CreateProductDto) {}
+export class ProductImageDataDto {
+  @IsString()
+  @IsOptional()
+  url: string;
+
+  @IsString()
+  @IsOptional()
+  uuid: string;
+}
+
+export class UpdateProductDto extends PartialType(CreateProductDto) {
+  @IsString()
+  @IsOptional()
+  isActive?: string;
+
+  @IsArray()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch (e) {
+        return [];
+      }
+    }
+    return value;
+  })
+  @IsOptional()
+  productImageData?: ProductImageDataDto[];
+}
 
 export class QueryProductDto extends SearchPaginationDto {
   @IsOptional()

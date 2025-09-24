@@ -349,7 +349,74 @@ export class ProductService {
     // ===== FILE HANDLING =====
     const allAbsToCleanup: string[] = [];
 
-    // Galeri (produk/bundle)
+    // ===== HANDLE IMAGE DELETION =====
+    const imagesToDelete: string[] = [];
+    let imageDeleteData: any = undefined;
+
+    if (
+      dto.productImageData &&
+      Array.isArray(dto.productImageData) &&
+      dto.productImageData.length > 0
+    ) {
+      // Validasi bahwa gambar yang akan dihapus ada di database
+      if (isSingle && existingProduct) {
+        const existingImageUuids = existingProduct.productImage.map(
+          (img) => img.uuid,
+        );
+        const deleteUuids = dto.productImageData.map((img) => img.uuid);
+
+        // Filter hanya UUID yang benar-benar ada
+        const validDeleteUuids = deleteUuids.filter((uuid) =>
+          existingImageUuids.includes(uuid),
+        );
+
+        if (validDeleteUuids.length > 0) {
+          // Collect file paths untuk dihapus dari storage
+          const imagesToDeleteFromStorage = existingProduct.productImage
+            .filter((img) => validDeleteUuids.includes(img.uuid))
+            .map((img) => urlToAbs(img.url));
+
+          imagesToDelete.push(...imagesToDeleteFromStorage);
+
+          // Setup delete operation untuk database
+          imageDeleteData = {
+            deleteMany: {
+              uuid: { in: validDeleteUuids },
+            },
+          };
+        }
+      }
+
+      if (isBundle && existingBundle) {
+        const existingImageUuids = existingBundle.bundleImage.map(
+          (img) => img.uuid,
+        );
+        const deleteUuids = dto.productImageData.map((img) => img.uuid);
+
+        // Filter hanya UUID yang benar-benar ada
+        const validDeleteUuids = deleteUuids.filter((uuid) =>
+          existingImageUuids.includes(uuid),
+        );
+
+        if (validDeleteUuids.length > 0) {
+          // Collect file paths untuk dihapus dari storage
+          const imagesToDeleteFromStorage = existingBundle.bundleImage
+            .filter((img) => validDeleteUuids.includes(img.uuid))
+            .map((img) => urlToAbs(img.url));
+
+          imagesToDelete.push(...imagesToDeleteFromStorage);
+
+          // Setup delete operation untuk database
+          imageDeleteData = {
+            deleteMany: {
+              uuid: { in: validDeleteUuids },
+            },
+          };
+        }
+      }
+    }
+
+    // Galeri (produk/bundle) - untuk gambar baru
     const productImages = dto.productImages ?? [];
     assertImages(productImages);
 
@@ -470,10 +537,12 @@ export class ProductService {
             model: modelConnect,
             capacity: capacityConnect,
             categoryProduct: categoryProductConnect,
-            productImage:
-              (productImageRows?.length ?? 0) > 0
+            productImage: {
+              ...(imageDeleteData ? imageDeleteData : {}),
+              ...((productImageRows?.length ?? 0) > 0
                 ? { create: productImageRows }
-                : undefined,
+                : {}),
+            },
           };
 
           const prod = await tx.product.update({
@@ -506,6 +575,11 @@ export class ProductService {
           .map((p) => p.oldPhotoAbs)
           .filter((x): x is string => !!x);
         if (oldToDelete.length) await deleteFilesBestEffort(oldToDelete);
+
+        // 4) hapus gambar yang diminta untuk dihapus
+        if (imagesToDelete.length) {
+          await deleteFilesBestEffort(imagesToDelete);
+        }
 
         return updated;
       }
@@ -562,10 +636,12 @@ export class ProductService {
               isHide: parseFormBoolean(dto.isHide),
               price: typeof newPrice === 'number' ? newPrice : undefined,
               rating: parseFloat(dto.rating ?? '0'),
-              bundleImage:
-                (bundleImageRows?.length ?? 0) > 0
+              bundleImage: {
+                ...(imageDeleteData ? imageDeleteData : {}),
+                ...((bundleImageRows?.length ?? 0) > 0
                   ? { create: bundleImageRows }
-                  : undefined,
+                  : {}),
+              },
               items: itemsData,
             },
             include: {
@@ -577,6 +653,11 @@ export class ProductService {
             },
           });
         });
+
+        // Hapus gambar bundle yang diminta untuk dihapus
+        if (imagesToDelete.length) {
+          await deleteFilesBestEffort(imagesToDelete);
+        }
 
         return updated;
       }
