@@ -19,6 +19,7 @@ import { Roles } from 'src/auth/decorator';
 import { TypeRoleAdmin } from '@prisma/client';
 import {
   CreateBannerCampaignDto,
+  SearchBannerCampaignDto,
   UpdateBannerCampaignDto,
 } from './dto/banner-campaign.dto';
 import { formatResponse } from 'helpers/http.helper';
@@ -49,7 +50,10 @@ export class BannerCampaignController {
   }
 
   @Get()
-  async getAll(@Query() queries: SearchPaginationDto, @Res() res: Response) {
+  async getAll(
+    @Query() queries: SearchBannerCampaignDto,
+    @Res() res: Response,
+  ) {
     try {
       const result = await this.bannerCampaignService.getAll(queries);
       return formatResponse(res, HttpStatus.OK, result.data, result.meta);

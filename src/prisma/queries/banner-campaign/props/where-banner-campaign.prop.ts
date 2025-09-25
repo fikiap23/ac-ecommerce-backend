@@ -19,5 +19,9 @@ export const whereBannerCampaignGetManyPaginate = (
     ];
   }
 
+  if (props.type) {
+    where.type = props.type;
+  }
+
   return { where };
 };

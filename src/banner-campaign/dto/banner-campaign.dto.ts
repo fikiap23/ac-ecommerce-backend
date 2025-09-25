@@ -1,6 +1,13 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { TypeBanner } from '@prisma/client';
-import { IsEnum, IsNotEmpty, IsString, Length } from 'class-validator';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Length,
+} from 'class-validator';
+import { SearchPaginationDto } from 'utils/dto/pagination.dto';
 
 export class CreateBannerCampaignDto {
   @IsString()
@@ -15,3 +22,9 @@ export class CreateBannerCampaignDto {
 export class UpdateBannerCampaignDto extends PartialType(
   CreateBannerCampaignDto,
 ) {}
+
+export class SearchBannerCampaignDto extends SearchPaginationDto {
+  @IsEnum(TypeBanner)
+  @IsOptional()
+  type?: TypeBanner;
+}

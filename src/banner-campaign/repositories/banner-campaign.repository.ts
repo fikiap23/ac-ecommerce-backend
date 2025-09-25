@@ -60,12 +60,44 @@ export class BannerCampaignRepository {
   }
 
   async deleteImage(image: string) {
-    // get file name
-    const splitted = image.split('/');
-    const oldImage = [splitted[splitted.length - 1]];
-    // delete
-    if (process.env.STORAGE_ENABLE === 'true') {
-      await this.gatewayService.httpDeleteFiles(oldImage);
+    if (!image) return;
+
+    // Ambil pathname kalau full URL, atau pakai apa adanya kalau relatif
+    let rel = image;
+    try {
+      if (/^https?:\/\//i.test(image)) {
+        const u = new URL(image);
+        rel = u.pathname; // contoh: /upload/banner-campaign/images/xxx.jpg
+      }
+    } catch {
+      // abaikan parsing URL jika gagal
+    }
+
+    // Pastikan diawali slash
+    if (!rel.startsWith('/')) rel = `/${rel}`;
+
+    // Validasi harus berada di bawah /upload/
+    const UPLOAD_PREFIX = '/upload/';
+    if (!rel.startsWith(UPLOAD_PREFIX)) {
+      throw new Error('Path gambar tidak valid (bukan di /upload/).');
+    }
+
+    // Map ke path filesystem di bawah public
+    const publicDir = path.join(process.cwd(), 'public'); // .../public
+    const fsPath = path.join(publicDir, rel.replace(/^\//, '')); // public/upload/...
+
+    // Normalisasi & cegah path traversal
+    const normalized = path.normalize(fsPath);
+    if (!normalized.startsWith(publicDir + path.sep)) {
+      throw new Error('Path traversal terdeteksi.');
+    }
+
+    // Hapus file (abaikan jika tidak ada)
+    try {
+      await fs.unlink(normalized);
+    } catch (err: any) {
+      if (err?.code === 'ENOENT') return; // file sudah tidak ada, aman
+      throw err;
     }
   }
 
