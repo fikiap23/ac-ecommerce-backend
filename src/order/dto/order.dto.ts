@@ -50,6 +50,12 @@ export class ShippingAddressDto {
 export class CartItemDto {
   @IsString()
   @IsOptional()
+  cartUuid?: string;
+}
+
+export class CartItemProductDto {
+  @IsString()
+  @IsOptional()
   productUuid?: string;
 
   @IsString()
@@ -67,10 +73,6 @@ export class CartItemDto {
   @IsString()
   @IsOptional()
   deviceId?: string;
-
-  @IsEnum(['PRODUCT', 'BUNDLE'])
-  @IsNotEmpty()
-  type: 'PRODUCT' | 'BUNDLE';
 }
 
 export class CreateOrderDto {

@@ -106,6 +106,8 @@ export const selectGeneralListOrders: Prisma.OrderSelect = {
       quantity: true,
       name: true,
       price: true,
+      sourcePackageType: true,
+      bundleGroupId: true,
     },
   },
   totalPayment: true,

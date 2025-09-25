@@ -8,11 +8,10 @@ import {
 import { OrderQuery } from 'src/prisma/queries/order/order.query';
 import { ICreateOrder, IFilterOrder } from '../interfaces/order.interface';
 import { CustomError } from 'helpers/http.helper';
-import { CreateOrderDto } from '../dto/order.dto';
+import { CartItemProductDto, CreateOrderDto } from '../dto/order.dto';
 import { ISelectVoucherForCalculate } from 'src/voucher/interfaces/voucher.interface';
 import { ISelectProductForCreateOrder } from 'src/product/interfaces/product.interface';
 import { whereOrderGetManyPaginate } from 'src/prisma/queries/order/props/where-order.prop';
-import { IOrderDeliveryService } from '../interfaces/order-delivery-service.interface';
 
 @Injectable()
 export class OrderRepository {
@@ -25,86 +24,79 @@ export class OrderRepository {
     */
 
   async calculateTotalAmount(
-    carts: CreateOrderDto['carts'],
-    entities: (ISelectProductForCreateOrder & {
+    carts: CartItemProductDto[],
+    products: (ISelectProductForCreateOrder & {
       productVariant: {
         uuid: string;
         salePrice: number | null;
         regularPrice: number;
       }[];
     })[],
-    minusPrice?: number,
+    minusPrice: number,
   ): Promise<number> {
-    const entityMap = new Map(entities.map((e) => [e.uuid, e]));
+    const productMap = new Map(products.map((p) => [p.uuid, p]));
     let totalAmount = 0;
 
-    for (const cart of carts) {
-      const isBundle = cart.type === 'BUNDLE';
-      const idToFind = isBundle ? (cart as any).bundleUuid : cart.productUuid;
+    for (const cartItem of carts) {
+      const product = productMap.get(cartItem.productUuid);
 
-      const entity = idToFind ? entityMap.get(idToFind) : undefined;
-      if (!entity) {
+      if (!product) {
         throw new CustomError({
-          message: `${isBundle ? 'Bundle' : 'Produk'} dengan UUID ${
-            idToFind ?? '(kosong)'
-          } tidak ditemukan`,
+          message: `Produk dengan UUID ${cartItem.productUuid} tidak ditemukan`,
           statusCode: 404,
         });
       }
 
-      if (!isBundle) {
-        // === PRODUCT ===
-        if (!cart.productVariantUuid) {
+      const isProductType = product.serviceType === 'PRODUCT';
+
+      if (isProductType) {
+        // Wajib ada variant utk PRODUCT
+        if (!cartItem.productVariantUuid) {
           throw new CustomError({
-            message: `Varian wajib dipilih untuk produk ${entity.name}`,
+            message: `Varian wajib dipilih untuk produk ${product.name}`,
             statusCode: 400,
           });
         }
 
-        const variant = entity.productVariant.find(
-          (v) => v.uuid === cart.productVariantUuid,
+        const variant = product.productVariant.find(
+          (v) => v.uuid === cartItem.productVariantUuid,
         );
+
         if (!variant) {
           throw new CustomError({
-            message: `Varian produk tidak ditemukan untuk produk ${entity.name}`,
+            message: `Varian produk tidak ditemukan untuk produk ${product.name}`,
             statusCode: 404,
           });
         }
 
         const priceToUse = variant.salePrice ?? variant.regularPrice;
+
         if (priceToUse == null || Number.isNaN(Number(priceToUse))) {
           throw new CustomError({
-            message: `Harga varian ${entity.name} tidak valid`,
+            message: `Harga varian ${product.name} tidak valid`,
             statusCode: 400,
           });
         }
 
-        totalAmount += Number(priceToUse) * cart.quantity;
-        totalAmount -= minusPrice ?? 0;
-        continue;
-      }
+        totalAmount += Number(priceToUse) * cartItem.quantity;
+        console.log('PRODUCT');
+        console.log(totalAmount);
+        console.log(variant.salePrice, variant.regularPrice);
+      } else {
+        const priceToUse = product.salePrice ?? product.price;
 
-      // === BUNDLE ===
-      if (cart.productVariantUuid) {
-        throw new CustomError({
-          message: `Bundle tidak memerlukan varian`,
-          statusCode: 400,
-        });
-      }
+        if (priceToUse == null || Number.isNaN(Number(priceToUse))) {
+          throw new CustomError({
+            message: `Harga produk layanan ${product.name} tidak valid`,
+            statusCode: 400,
+          });
+        }
 
-      const bundlePrice = entity.salePrice ?? entity.price;
-      if (bundlePrice == null || Number.isNaN(Number(bundlePrice))) {
-        throw new CustomError({
-          message: `Harga bundle ${entity.name} tidak valid`,
-          statusCode: 400,
-        });
+        totalAmount += Number(priceToUse) * cartItem.quantity;
       }
-
-      totalAmount += Number(bundlePrice) * cart.quantity;
-      totalAmount -= minusPrice ?? 0;
     }
 
-    return totalAmount;
+    return totalAmount - minusPrice;
   }
 
   async calculateVoucher({
@@ -116,7 +108,7 @@ export class OrderRepository {
   }: {
     voucher: ISelectVoucherForCalculate;
     customerId: number;
-    carts: CreateOrderDto['carts'];
+    carts: CartItemProductDto[];
     products: ISelectProductForCreateOrder[];
     subTotalPay: number;
   }) {
@@ -482,5 +474,50 @@ export class OrderRepository {
     _sum?: Prisma.OrderSumAggregateInputType;
   }) {
     return await this.orderQuery.groupBy({ tx, by, _count, where, _sum });
+  }
+
+  mapToCarts(cart: any[]): {
+    productUuid: string;
+    quantity: number;
+    deviceId?: string | null;
+    productVariantUuid?: string | null;
+    sourcePackageType: 'SINGLE' | 'BUNDLE';
+    bundleGroupId?: string | null;
+  }[] {
+    return cart.flatMap((item: any) => {
+      const quantity = item.quantity ?? 1;
+
+      // jika bundle → pecah + beri identitas grup
+      if (
+        Array.isArray(item.customerProductBundle) &&
+        item.customerProductBundle.length > 0
+      ) {
+        // pakai customerProductId sebagai group id (string-kan saja)
+        const groupId = String(
+          item.customerProductBundle[0]?.customerProductId ?? item.uuid ?? '',
+        );
+
+        return item.customerProductBundle.map((b: any) => ({
+          productUuid: b.product?.uuid ?? '',
+          quantity,
+          deviceId: b.deviceId ?? item.deviceId ?? null,
+          productVariantUuid: b.productVariant?.uuid ?? null,
+          sourcePackageType: 'BUNDLE',
+          bundleGroupId: groupId || null,
+        }));
+      }
+
+      // single biasa
+      return [
+        {
+          productUuid: item.productVariant?.product?.uuid ?? '',
+          quantity,
+          deviceId: item.deviceId ?? null,
+          productVariantUuid: item.productVariant?.uuid ?? null,
+          sourcePackageType: 'SINGLE',
+          bundleGroupId: null,
+        },
+      ];
+    });
   }
 }

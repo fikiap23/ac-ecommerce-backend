@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { CustomError } from 'helpers/http.helper';
 import { AuthService } from 'src/auth/auth.service';
-import { CartItemDto, CreateOrderDto } from '../dto/order.dto';
+import { CartItemProductDto, CreateOrderDto } from '../dto/order.dto';
 import { Product, ProductVariant, TypeStatusOrder } from '@prisma/client';
 import { IOrderDeliveryService } from '../interfaces/order-delivery-service.interface';
 import { ISelectProductForCreateOrder } from '../interfaces/order.interface';
@@ -58,7 +58,7 @@ export class OrderValidateRepository {
   }
 
   async validateProducts(
-    carts: CreateOrderDto['carts'],
+    carts: CartItemProductDto[],
     products: ISelectProductForCreateOrder[],
   ) {
     const productMap = new Map(products.map((p) => [p.uuid, p]));
@@ -155,47 +155,33 @@ export class OrderValidateRepository {
   async validateProductsWithVariants(
     carts: {
       productUuid?: string;
-      productVariantUuid?: string;
+      productVariantUuid?: string; // boleh kosong utk SERVICE
       quantity: number;
-      type?: 'PRODUCT' | 'BUNDLE';
     }[],
-    products: (Product & {
-      productVariant: ProductVariant[];
-      _originalBundle?: any;
-    })[],
+    products: (Product & { productVariant: ProductVariant[] })[],
   ) {
     const validatedItems: {
       product: Product;
       variant?: ProductVariant | null;
       quantity: number;
-      type: 'PRODUCT' | 'BUNDLE' | 'SERVICE';
     }[] = [];
 
     for (const cart of carts) {
-      const kind: 'PRODUCT' | 'BUNDLE' | 'SERVICE' =
-        (cart.type as any) || (cart.productVariantUuid ? 'PRODUCT' : 'SERVICE');
-
-      const bundleUuid = (cart as any).bundleUuid as string | undefined;
-      const idToFind = kind === 'BUNDLE' ? bundleUuid : cart.productUuid;
-
-      const product = products.find((p) => p.uuid === idToFind);
+      const product = products.find((p) => p.uuid === cart.productUuid);
 
       if (!product) {
-        const label =
-          kind === 'BUNDLE'
-            ? 'Bundle'
-            : kind === 'PRODUCT'
-            ? 'Produk'
-            : 'Layanan';
         throw new CustomError({
-          message: `${label} dengan UUID ${
-            idToFind ?? '(kosong)'
-          } tidak ditemukan`,
+          message: `Produk dengan UUID ${cart.productUuid} tidak ditemukan`,
           statusCode: 404,
         });
       }
 
-      if (kind === 'PRODUCT') {
+      const serviceType = String(
+        (product as any).serviceType || '',
+      ).toUpperCase();
+      const isProductType = serviceType === 'PRODUCT';
+
+      if (isProductType) {
         if (!cart.productVariantUuid) {
           throw new CustomError({
             message: `Varian wajib dipilih untuk produk ${product.name}`,
@@ -214,7 +200,7 @@ export class OrderValidateRepository {
           });
         }
 
-        if (Number(variant.stock ?? 0) < cart.quantity) {
+        if (variant.stock < cart.quantity) {
           throw new CustomError({
             message: `Stok varian ${variant.name} tidak mencukupi`,
             statusCode: 400,
@@ -225,123 +211,16 @@ export class OrderValidateRepository {
           product,
           variant,
           quantity: cart.quantity,
-          type: 'PRODUCT',
         });
-        continue;
-      }
-
-      if (kind === 'BUNDLE') {
-        if (cart.productVariantUuid) {
-          throw new CustomError({
-            message: `Bundle tidak memerlukan varian`,
-            statusCode: 400,
-          });
-        }
-
-        const bundle = (product as any)._originalBundle;
-        if (bundle?.items?.length) {
-          for (const item of bundle.items) {
-            const p = item.product;
-            const name = p?.name ?? '(produk bundle)';
-            const stock = Number(p?.stock ?? Infinity);
-            if (isFinite(stock) && stock < cart.quantity) {
-              throw new CustomError({
-                message: `Stok produk ${name} dalam bundle tidak mencukupi`,
-                statusCode: 400,
-              });
-            }
-          }
-        }
-
+      } else {
         validatedItems.push({
           product,
           variant: null,
           quantity: cart.quantity,
-          type: 'BUNDLE',
         });
-        continue;
       }
-
-      validatedItems.push({
-        product,
-        variant: null,
-        quantity: cart.quantity,
-        type: 'SERVICE',
-      });
     }
 
     return validatedItems;
   }
-
-  // Alternative approach: Create separate validation functions and call them conditionally
-  // async validateUnifiedItems(
-  //   carts: CartItemDto[],
-  //   products: any[],
-  //   bundles: any[],
-  // ) {
-  //   const productCarts = carts.filter((c) => c.type === 'PRODUCT');
-  //   const bundleCarts = carts.filter((c) => c.type === 'BUNDLE');
-
-  //   // Validate products using existing function
-  //   if (productCarts.length > 0) {
-  //     const transformedProductCarts = productCarts.map((cart) => ({
-  //       productUuid: cart.productUuid,
-  //       productVariantUuid: cart.productVariantUuid,
-  //       quantity: cart.quantity,
-  //     }));
-
-  //     await this.validateProductsWithVariants(
-  //       transformedProductCarts,
-  //       products,
-  //     );
-  //   }
-
-  //   // Validate bundles using new function
-  //   if (bundleCarts.length > 0) {
-  //     await this.validateBundles(bundleCarts, bundles);
-  //   }
-  // }
-
-  // New bundle validation function
-  // async validateBundles(
-  //   carts: {
-  //     bundleUuid?: string;
-  //     quantity: number;
-  //   }[],
-  //   bundles: any[],
-  // ) {
-  //   for (const cart of carts) {
-  //     const bundle = bundles.find((b) => b.uuid === cart?.bundleUuid);
-
-  //     if (!bundle) {
-  //       throw new CustomError({
-  //         message: `Bundle dengan UUID ${cart.bundleUuid} tidak ditemukan`,
-  //         statusCode: 404,
-  //       });
-  //     }
-
-  //     // Validate bundle is active
-  //     if (!bundle.isActive) {
-  //       throw new CustomError({
-  //         message: `Bundle ${bundle.name} tidak aktif`,
-  //         statusCode: 400,
-  //       });
-  //     }
-
-  //     // Optional: Validate stock for products in the bundle
-  //     if (bundle.items) {
-  //       for (const bundleItem of bundle.items) {
-  //         if (
-  //           bundleItem.product.stock &&
-  //           bundleItem.product.stock < cart.quantity
-  //         ) {
-  //           throw new CustomError({
-  //             message: `Stok produk ${bundleItem.product.name} dalam bundle ${bundle.name} tidak mencukupi`,
-  //             statusCode: 400,
-  //           });
-  //         }
-  //       }
-  //     }
-  //   }
-  // }
 }

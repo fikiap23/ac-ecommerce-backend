@@ -293,7 +293,6 @@ model Bundle {
   items           ProductBundleItem[]
   bundleImage     BundleImage[]
   customerProduct CustomerProduct[]
-  orderProduct    OrderProduct[]
 }
 
 model BundleImage {
@@ -482,29 +481,8 @@ model OrderProduct {
   order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderId Int
 
-  bundleId         Int?
-  bundle           Bundle?           @relation(fields: [bundleId], references: [id], onDelete: SetNull)
-  orderBundleItems OrderBundleItem[]
-}
-
-model OrderBundleItem {
-  id           Int     @id @default(autoincrement())
-  uuid         String  @unique @default(uuid())
-  productId    Int?
-  productUuid  String?
-  productName  String
-  productPrice Int
-
-  itemQuantity Int @default(1)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  orderProduct   OrderProduct @relation(fields: [orderProductId], references: [id], onDelete: Cascade)
-  orderProductId Int
-
-  @@index([orderProductId])
-  @@index([productId])
+  sourcePackageType TypeProductPackage?
+  bundleGroupId     String?
 }
 
 model OrderProductImage {
