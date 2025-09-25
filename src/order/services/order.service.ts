@@ -114,6 +114,13 @@ export class OrderService {
             select: {
               id: true,
               uuid: true,
+              bundle: {
+                select: {
+                  uuid: true,
+                  name: true,
+                  bundleImage: true,
+                },
+              },
               customerProductBundle: {
                 include: {
                   product: {
@@ -133,7 +140,7 @@ export class OrderService {
       serviceType: 'BUNDLE',
       packageType: 'BUNDLE',
       productVariant: bundle.customerProductBundle.productVariant,
-      productImage: bundle.customerProductBundle.product.productImage || [],
+      productImage: bundle?.bundle?.bundleImage || [],
       type: null,
       model: null,
       capacity: null,
