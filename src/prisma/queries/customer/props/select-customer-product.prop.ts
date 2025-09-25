@@ -67,13 +67,51 @@ export const selectCustomerProduct: Prisma.CustomerProductSelect = {
 };
 
 export const selectCustomerProductForUpdate: Prisma.CustomerProductSelect = {
+  id: true,
+  uuid: true,
+  quantity: true,
+  deviceId: true,
   productId: true,
   productVariantId: true,
   bundleId: true,
-  bundle: true,
   product: {
     select: {
       id: true,
+      uuid: true,
+      name: true,
+      productVariant: {
+        select: { id: true, uuid: true, name: true, stock: true },
+      },
     },
   },
+  bundle: {
+    select: {
+      id: true,
+      uuid: true,
+      name: true,
+      items: {
+        select: {
+          product: {
+            select: {
+              id: true,
+              uuid: true,
+              name: true,
+              productVariant: {
+                select: { id: true, uuid: true, name: true, stock: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  customerProductBundle: {
+    select: {
+      id: true,
+      productId: true,
+      productVariantId: true,
+      product: { select: { uuid: true } },
+    },
+  },
+  customer: { select: { id: true } },
 };

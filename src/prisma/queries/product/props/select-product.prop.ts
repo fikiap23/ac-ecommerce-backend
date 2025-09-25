@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 
 export const selectGeneralProduct: Prisma.ProductSelect = {
+  id: true,
   uuid: true,
   name: true,
   brand: true,

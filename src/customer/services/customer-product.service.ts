@@ -307,100 +307,134 @@ export class CustomerProductService {
 
     // ===================== BUNDLE FLOW =====================
     if (isBundle) {
-      // Get bundle UUID first
-      const bundleRecord = await this.customerProductRepository.findOne({
-        where: { uuid },
-        select: {
-          bundle: {
-            select: { uuid: true },
-          },
-        },
-      });
-
-      if (!bundleRecord?.bundle?.uuid) {
-        throw new CustomError({
-          message: 'Bundle tidak ditemukan',
-          statusCode: 404,
-        });
-      }
-
+      // ambil definisi bundle + items untuk validasi
       const bundle = await this.productRepository.getThrowProductOrBundleByUuid(
         {
-          uuid: bundleRecord.bundle.uuid,
+          uuid: customerProduct.bundle?.uuid || '',
           selectBundle: selectGenerealBundle,
         },
       );
-
       const bundleEntity = bundle as ISelectGeneralBundle;
       const bundleItems = Array.isArray(bundleEntity.items)
         ? bundleEntity.items
         : [];
 
-      // Validate products in DTO if provided
-      if (dto.productBundles && dto.productBundles.length > 0) {
-        const bundleProductMap = new Map<string, any>(
-          bundleItems
-            .filter((bi: any) => bi?.product?.uuid)
-            .map((bi: any) => [bi.product.uuid as string, bi.product]),
-        );
+      // Map: productUuid -> baseProduct (dari definisi bundle)
+      const bundleProductMap = new Map<string, any>(
+        bundleItems
+          .filter((bi: any) => bi?.product?.uuid)
+          .map((bi: any) => [bi.product.uuid as string, bi.product]),
+      );
+      console.log('bundleProductMap', bundleProductMap);
 
-        // Get existing bundle products
-        const existingBundleData: any =
-          await this.customerProductRepository.findOne({
-            where: { uuid },
-            select: {
-              customerProductBundle: {
-                include: {
-                  product: { select: { uuid: true } },
-                  productVariant: { select: { uuid: true } },
-                },
-              },
-            },
-          });
+      // Map: productId -> child (record existing di cart)
+      const childByProductId = new Map<
+        number,
+        { id: number; productVariantId: number | null }
+      >(
+        (customerProduct.customerProductBundle ?? []).map((cb: any) => [
+          cb.productId as number,
+          { id: cb.id, productVariantId: cb.productVariantId ?? null },
+        ]),
+      );
 
-        const existingProducts =
-          existingBundleData?.customerProductBundle || [];
-        const existingProductMap = new Map(
-          existingProducts.map((ep) => [ep.product.uuid, ep]),
-        );
+      console.log('childByProductId', childByProductId);
 
-        const seen = new Set<string>();
+      const wantQty = Number(dto.quantity ?? customerProduct.quantity ?? 1);
+      if (!Number.isFinite(wantQty) || wantQty < 1) {
+        throw new CustomError({
+          message: 'Quantity tidak valid',
+          statusCode: 400,
+        });
+      }
 
-        for (const p of dto.productBundles) {
-          if (!p?.uuid) {
-            throw new CustomError({
-              message: 'Produk dalam bundle wajib memiliki uuid',
-              statusCode: 400,
+      // Kalau tidak kirim productBundles → hanya update qty/deviceId (validasi stok minimal)
+      if (
+        !Array.isArray(dto.productBundles) ||
+        dto.productBundles.length === 0
+      ) {
+        // opsional: validasi stok semua child jika qty berubah
+        for (const child of customerProduct.customerProductBundle ?? []) {
+          if (child.productVariantId) {
+            const pv = await this.productVariantRepository.getThrowById({
+              id: child.productVariantId,
             });
-          }
-          if (seen.has(p.uuid)) {
-            throw new CustomError({
-              message: `Produk ${p.uuid} terduplikasi dalam payload bundle`,
-              statusCode: 400,
-            });
-          }
-          seen.add(p.uuid);
-
-          const baseProduct = bundleProductMap.get(p.uuid);
-          if (!baseProduct) {
-            throw new CustomError({
-              message: `Produk ${p.uuid} tidak termasuk dalam bundle ini`,
-              statusCode: 400,
-            });
-          }
-
-          const variants = Array.isArray(baseProduct.productVariant)
-            ? baseProduct.productVariant
-            : [];
-
-          if (variants.length > 0) {
-            if (!p.variantUuid) {
+            const stock = Number(pv.stock ?? Infinity);
+            if (isFinite(stock) && stock < wantQty) {
               throw new CustomError({
-                message: `Varian wajib dipilih untuk produk ${baseProduct.name} di dalam bundle`,
+                message:
+                  'Stok salah satu varian dalam bundle tidak mencukupi untuk quantity baru',
                 statusCode: 400,
               });
             }
+          }
+        }
 
+        return await this.customerProductRepository.updateByUuid({
+          uuid,
+          data: {
+            quantity: wantQty,
+            deviceId: dto.deviceId ?? customerProduct.deviceId ?? null,
+          },
+        });
+      }
+
+      // ========= PARTIAL UPDATE: hanya update produk yang ada di payload =========
+      type PayloadItem = {
+        uuid: string;
+        variantUuid?: string | null;
+        deviceId?: string | null;
+      };
+
+      const seen = new Set<string>();
+      const nestedUpdates: {
+        where: { id: number };
+        data: Prisma.CustomerProductBundleUpdateWithoutCustomerProductInput;
+      }[] = [];
+
+      for (const p of dto.productBundles as PayloadItem[]) {
+        if (!p?.uuid) {
+          throw new CustomError({
+            message: 'Produk dalam bundle wajib memiliki uuid',
+            statusCode: 400,
+          });
+        }
+        if (seen.has(p.uuid)) {
+          throw new CustomError({
+            message: `Produk ${p.uuid} terduplikasi dalam payload bundle`,
+            statusCode: 400,
+          });
+        }
+        seen.add(p.uuid);
+
+        // validasi: produk harus bagian dari bundle definition
+        const baseProduct = bundleProductMap.get(p.uuid);
+        if (!baseProduct) {
+          throw new CustomError({
+            message: `Produk ${p.uuid} tidak termasuk dalam bundle ini`,
+            statusCode: 400,
+          });
+        }
+
+        // child (baris existing) untuk produk ini harus ada di keranjang bundle
+        console.log(childByProductId);
+        const child = childByProductId.get(baseProduct.id);
+        if (!child) {
+          throw new CustomError({
+            message: `Produk ${p.uuid} tidak ditemukan pada item bundle di keranjang`,
+            statusCode: 404,
+          });
+        }
+
+        // validasi varian (kalau ada)
+        const variants = Array.isArray(baseProduct.productVariant)
+          ? baseProduct.productVariant
+          : [];
+
+        if (variants.length > 0) {
+          // Kalau bundle product bervarian → boleh ganti varian (wajib valid), atau
+          // kalau ingin lepas varian, kirim variantUuid = null/undefined? (di bawah kita support disconnect saat null).
+          if (p.variantUuid) {
             const variant = variants.find((v: any) => v.uuid === p.variantUuid);
             if (!variant) {
               throw new CustomError({
@@ -408,118 +442,75 @@ export class CustomerProductService {
                 statusCode: 404,
               });
             }
-
-            const needQty = Number(dto.quantity ?? 1);
+            // cek stok varian baru untuk quantity bundle yang diminta
             const stock = Number(variant.stock ?? Infinity);
-            if (isFinite(stock) && stock < needQty) {
+            if (isFinite(stock) && stock < wantQty) {
               throw new CustomError({
                 message: `Stok varian ${variant.name} pada produk ${baseProduct.name} tidak mencukupi`,
                 statusCode: 400,
               });
             }
+
+            // siapkan nested update: connect varian baru
+            nestedUpdates.push({
+              where: { id: child.id },
+              data: {
+                productVariant: { connect: { uuid: p.variantUuid } },
+                ...(p.deviceId !== undefined ? { deviceId: p.deviceId } : {}),
+              },
+            });
+          } else if (p.variantUuid === null) {
+            // optional: jika kirim null → lepas varian (disconnect)
+            nestedUpdates.push({
+              where: { id: child.id },
+              data: {
+                productVariant: { disconnect: true },
+                ...(p.deviceId !== undefined ? { deviceId: p.deviceId } : {}),
+              },
+            });
           } else {
-            if (p.variantUuid) {
-              throw new CustomError({
-                message: `Produk ${baseProduct.name} tidak memiliki varian, jangan kirim variantUuid`,
-                statusCode: 400,
+            // payload tidak menyentuh varian → jangan ubah varian; tapi boleh update deviceId
+            if (p.deviceId !== undefined) {
+              nestedUpdates.push({
+                where: { id: child.id },
+                data: { deviceId: p.deviceId },
               });
             }
           }
-
-          const existingProduct: any = existingProductMap.get(p.uuid);
-
-          if (!existingProduct) {
+        } else {
+          // produk bundle TIDAK bervarian → tolak bila user mengirim variantUuid
+          if (p.variantUuid) {
             throw new CustomError({
-              message: `Produk ${p.uuid} tidak ditemukan dalam bundle cart item`,
+              message: `Produk ${baseProduct.name} tidak memiliki varian, jangan kirim variantUuid`,
               statusCode: 400,
             });
           }
 
-          // Check if variant needs to be updated
-          const currentVariantUuid = existingProduct.productVariant?.uuid;
-          const newVariantUuid = p.variantUuid;
-
-          if (
-            currentVariantUuid !== newVariantUuid ||
-            p.deviceId !== existingProduct.deviceId
-          ) {
-            // Update existing product's variant using raw update
-            const updateData: any = {};
-
-            if (currentVariantUuid !== newVariantUuid) {
-              if (newVariantUuid) {
-                updateData.productVariantId = variants.find(
-                  (v) => v.uuid === newVariantUuid,
-                )?.id;
-              } else {
-                updateData.productVariantId = null;
-              }
-            }
-
-            if (p.deviceId !== undefined) {
-              updateData.deviceId = p.deviceId;
-            }
-
-            if (Object.keys(updateData).length > 0) {
-              await this.customerProductRepository.updateByUuid({
-                uuid: existingProduct.uuid,
-                data: updateData,
-              });
-            }
+          // update deviceId saja (kalau ada di payload)
+          if (p.deviceId !== undefined) {
+            nestedUpdates.push({
+              where: { id: child.id },
+              data: { deviceId: p.deviceId },
+            });
           }
         }
-
-        // Update main bundle quantity and deviceId
-        return await this.customerProductRepository.updateByUuid({
-          uuid,
-          data: {
-            quantity: dto.quantity,
-            deviceId: dto.deviceId,
-          },
-        });
-      } else {
-        // Update quantity only without changing bundle products
-        // Get existing bundle products for stock validation
-        const existingBundleData = await this.customerProductRepository.findOne(
-          {
-            where: { uuid },
-            select: {
-              customerProductBundle: {
-                include: {
-                  productVariant: true,
-                },
-              },
-            },
-          },
-        );
-
-        if (existingBundleData?.customerProductBundle) {
-          for (const bundleProduct of existingBundleData.customerProductBundle) {
-            if (bundleProduct.productVariantId) {
-              const variant = await this.productVariantRepository.getThrowById({
-                id: bundleProduct.productVariantId,
-              });
-
-              const needQty = Number(dto.quantity ?? 1);
-              const stock = Number(variant.stock ?? Infinity);
-              if (isFinite(stock) && stock < needQty) {
-                throw new CustomError({
-                  message: `Stok tidak mencukupi untuk varian ${variant.name}`,
-                  statusCode: 400,
-                });
-              }
-            }
-          }
-        }
-
-        return await this.customerProductRepository.updateByUuid({
-          uuid,
-          data: {
-            quantity: dto.quantity,
-            deviceId: dto.deviceId,
-          },
-        });
       }
+
+      // Build data update: hanya update parent qty/deviceId & anak-yg-disebut
+      const updateData: Prisma.CustomerProductUpdateArgs['data'] = {
+        quantity: wantQty,
+        deviceId: dto.deviceId ?? customerProduct.deviceId ?? null,
+        ...(nestedUpdates.length > 0 && {
+          customerProductBundle: {
+            update: nestedUpdates, // <— partial update per-child
+          },
+        }),
+      };
+
+      return await this.customerProductRepository.updateByUuid({
+        uuid,
+        data: updateData,
+      });
     }
 
     throw new CustomError({
