@@ -5,6 +5,7 @@ export const selectCustomerProduct: Prisma.CustomerProductSelect = {
   quantity: true,
   productVariant: true,
   deviceId: true,
+  customerProductBundle: true,
   bundle: {
     include: {
       items: {
