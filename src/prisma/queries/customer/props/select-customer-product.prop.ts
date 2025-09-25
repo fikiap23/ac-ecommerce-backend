@@ -34,6 +34,7 @@ export const selectCustomerProduct: Prisma.CustomerProductSelect = {
           },
         },
       },
+      bundleImage: true,
     },
   },
   product: {
