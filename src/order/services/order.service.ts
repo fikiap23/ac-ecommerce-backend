@@ -165,11 +165,11 @@ export class OrderService {
     let deliveryFee = 0;
     let totalPayment = 0;
 
-    const minusPrice =
-      cart.reduce(
-        (acc: number, c: any) => acc + (c.bundle?.minusPrice ?? 0),
-        0,
-      ) || 0;
+    const minusPrice = cart.reduce((acc: number, c: any) => {
+      const qty = Number(c.quantity ?? 1);
+      const minus = Number(c.bundle?.minusPrice ?? 0);
+      return acc + minus * qty;
+    }, 0);
 
     const isMembership = sub;
     const useVoucher = isMembership && dto.voucherUuid;
