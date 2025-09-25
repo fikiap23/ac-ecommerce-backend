@@ -307,9 +307,26 @@ export class CustomerProductService {
 
     // ===================== BUNDLE FLOW =====================
     if (isBundle) {
+      // Get bundle UUID first
+      const bundleRecord = await this.customerProductRepository.findOne({
+        where: { uuid },
+        select: {
+          bundle: {
+            select: { uuid: true },
+          },
+        },
+      });
+
+      if (!bundleRecord?.bundle?.uuid) {
+        throw new CustomError({
+          message: 'Bundle tidak ditemukan',
+          statusCode: 404,
+        });
+      }
+
       const bundle = await this.productRepository.getThrowProductOrBundleByUuid(
         {
-          uuid: customerProduct.bundle?.uuid || '',
+          uuid: bundleRecord.bundle.uuid,
           selectBundle: selectGenerealBundle,
         },
       );
@@ -327,8 +344,27 @@ export class CustomerProductService {
             .map((bi: any) => [bi.product.uuid as string, bi.product]),
         );
 
+        // Get existing bundle products
+        const existingBundleData: any =
+          await this.customerProductRepository.findOne({
+            where: { uuid },
+            select: {
+              customerProductBundle: {
+                include: {
+                  product: { select: { uuid: true } },
+                  productVariant: { select: { uuid: true } },
+                },
+              },
+            },
+          });
+
+        const existingProducts =
+          existingBundleData?.customerProductBundle || [];
+        const existingProductMap = new Map(
+          existingProducts.map((ep) => [ep.product.uuid, ep]),
+        );
+
         const seen = new Set<string>();
-        const updateCustomerProductBundle: any[] = [];
 
         for (const p of dto.productBundles) {
           if (!p?.uuid) {
@@ -390,32 +426,75 @@ export class CustomerProductService {
             }
           }
 
-          updateCustomerProductBundle.push({
-            product: { connect: { uuid: p.uuid } },
-            ...(p.variantUuid && {
-              productVariant: { connect: { uuid: p.variantUuid } },
-              ...(p.deviceId && { deviceId: p.deviceId }),
-            }),
-          });
+          const existingProduct: any = existingProductMap.get(p.uuid);
+
+          if (!existingProduct) {
+            throw new CustomError({
+              message: `Produk ${p.uuid} tidak ditemukan dalam bundle cart item`,
+              statusCode: 400,
+            });
+          }
+
+          // Check if variant needs to be updated
+          const currentVariantUuid = existingProduct.productVariant?.uuid;
+          const newVariantUuid = p.variantUuid;
+
+          if (
+            currentVariantUuid !== newVariantUuid ||
+            p.deviceId !== existingProduct.deviceId
+          ) {
+            // Update existing product's variant using raw update
+            const updateData: any = {};
+
+            if (currentVariantUuid !== newVariantUuid) {
+              if (newVariantUuid) {
+                updateData.productVariantId = variants.find(
+                  (v) => v.uuid === newVariantUuid,
+                )?.id;
+              } else {
+                updateData.productVariantId = null;
+              }
+            }
+
+            if (p.deviceId !== undefined) {
+              updateData.deviceId = p.deviceId;
+            }
+
+            if (Object.keys(updateData).length > 0) {
+              await this.customerProductRepository.updateByUuid({
+                uuid: existingProduct.uuid,
+                data: updateData,
+              });
+            }
+          }
         }
 
-        // Update bundle with new product selections
+        // Update main bundle quantity and deviceId
         return await this.customerProductRepository.updateByUuid({
           uuid,
           data: {
             quantity: dto.quantity,
             deviceId: dto.deviceId,
-            customerProductBundle: {
-              deleteMany: {}, // Delete existing bundle products
-              create: updateCustomerProductBundle, // Create new bundle products
-            },
           },
         });
       } else {
         // Update quantity only without changing bundle products
-        // Validate stock for existing bundle products
-        if (customerProduct.customerProductBundle) {
-          for (const bundleProduct of customerProduct.customerProductBundle) {
+        // Get existing bundle products for stock validation
+        const existingBundleData = await this.customerProductRepository.findOne(
+          {
+            where: { uuid },
+            select: {
+              customerProductBundle: {
+                include: {
+                  productVariant: true,
+                },
+              },
+            },
+          },
+        );
+
+        if (existingBundleData?.customerProductBundle) {
+          for (const bundleProduct of existingBundleData.customerProductBundle) {
             if (bundleProduct.productVariantId) {
               const variant = await this.productVariantRepository.getThrowById({
                 id: bundleProduct.productVariantId,
