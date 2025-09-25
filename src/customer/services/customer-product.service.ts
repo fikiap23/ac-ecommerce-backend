@@ -239,25 +239,20 @@ export class CustomerProductService {
       },
       select: selectCustomerProductForUpdate,
     });
-    if (!customerProduct.productVariantId) {
+
+    if (!customerProduct) {
       throw new CustomError({
-        message: 'Produk tidak memiliki variant yang valid',
-        statusCode: 400,
+        message: 'Item keranjang tidak ditemukan',
+        statusCode: 404,
       });
     }
 
-    const productVariant = await this.productVariantRepository.getThrowById({
-      id: customerProduct.productVariantId,
-    });
+    const isBundle = !!customerProduct.bundleId;
+    const isProduct = !!customerProduct.productId;
 
-    if (Number(productVariant.stock) < dto.quantity) {
-      throw new CustomError({
-        message: 'Stok tidak mencukupi',
-        statusCode: 400,
-      });
-    }
-
-    if (customerProduct?.productVariantId) {
+    // ===================== PRODUCT FLOW =====================
+    if (isProduct && !isBundle) {
+      // Handle product variant updates
       if (dto.productVariantUuid) {
         const productVariant =
           await this.productVariantRepository.getThrowByUuidAndProductId({
@@ -265,39 +260,192 @@ export class CustomerProductService {
             productId: customerProduct.productId,
           });
 
-        const stock = productVariant.stock;
-
-        if (Number(stock) < dto.quantity) {
+        if (Number(productVariant.stock ?? 0) < dto.quantity) {
           throw new CustomError({
             message: 'Stok tidak mencukupi',
             statusCode: 400,
           });
         }
+
+        return await this.customerProductRepository.updateByUuid({
+          uuid,
+          data: {
+            quantity: dto.quantity,
+            deviceId: dto.deviceId,
+            productVariant: {
+              connect: {
+                uuid: dto.productVariantUuid,
+              },
+            },
+          },
+        });
       } else {
-        const stock = productVariant.stock;
+        // Update quantity only, keep existing variant
+        if (customerProduct.productVariantId) {
+          const productVariant =
+            await this.productVariantRepository.getThrowById({
+              id: customerProduct.productVariantId,
+            });
 
-        if (Number(stock) < dto.quantity) {
-          throw new CustomError({
-            message: 'Stok tidak mencukupi',
-            statusCode: 400,
-          });
+          if (Number(productVariant.stock ?? 0) < dto.quantity) {
+            throw new CustomError({
+              message: 'Stok tidak mencukupi',
+              statusCode: 400,
+            });
+          }
         }
+
+        return await this.customerProductRepository.updateByUuid({
+          uuid,
+          data: {
+            quantity: dto.quantity,
+            deviceId: dto.deviceId,
+          },
+        });
       }
     }
 
-    return await this.customerProductRepository.updateByUuid({
-      uuid,
-      data: {
-        quantity: dto.quantity,
-        deviceId: dto.deviceId,
-        ...(dto.productVariantUuid && {
-          productVariant: {
-            connect: {
-              uuid: dto.productVariantUuid,
+    // ===================== BUNDLE FLOW =====================
+    if (isBundle) {
+      const bundle = await this.productRepository.getThrowProductOrBundleByUuid(
+        {
+          uuid: customerProduct.bundle?.uuid || '',
+          selectBundle: selectGenerealBundle,
+        },
+      );
+
+      const bundleEntity = bundle as ISelectGeneralBundle;
+      const bundleItems = Array.isArray(bundleEntity.items)
+        ? bundleEntity.items
+        : [];
+
+      // Validate products in DTO if provided
+      if (dto.productBundles && dto.productBundles.length > 0) {
+        const bundleProductMap = new Map<string, any>(
+          bundleItems
+            .filter((bi: any) => bi?.product?.uuid)
+            .map((bi: any) => [bi.product.uuid as string, bi.product]),
+        );
+
+        const seen = new Set<string>();
+        const updateCustomerProductBundle: any[] = [];
+
+        for (const p of dto.productBundles) {
+          if (!p?.uuid) {
+            throw new CustomError({
+              message: 'Produk dalam bundle wajib memiliki uuid',
+              statusCode: 400,
+            });
+          }
+          if (seen.has(p.uuid)) {
+            throw new CustomError({
+              message: `Produk ${p.uuid} terduplikasi dalam payload bundle`,
+              statusCode: 400,
+            });
+          }
+          seen.add(p.uuid);
+
+          const baseProduct = bundleProductMap.get(p.uuid);
+          if (!baseProduct) {
+            throw new CustomError({
+              message: `Produk ${p.uuid} tidak termasuk dalam bundle ini`,
+              statusCode: 400,
+            });
+          }
+
+          const variants = Array.isArray(baseProduct.productVariant)
+            ? baseProduct.productVariant
+            : [];
+
+          if (variants.length > 0) {
+            if (!p.variantUuid) {
+              throw new CustomError({
+                message: `Varian wajib dipilih untuk produk ${baseProduct.name} di dalam bundle`,
+                statusCode: 400,
+              });
+            }
+
+            const variant = variants.find((v: any) => v.uuid === p.variantUuid);
+            if (!variant) {
+              throw new CustomError({
+                message: `Varian ${p.variantUuid} tidak ditemukan untuk produk ${baseProduct.name}`,
+                statusCode: 404,
+              });
+            }
+
+            const needQty = Number(dto.quantity ?? 1);
+            const stock = Number(variant.stock ?? Infinity);
+            if (isFinite(stock) && stock < needQty) {
+              throw new CustomError({
+                message: `Stok varian ${variant.name} pada produk ${baseProduct.name} tidak mencukupi`,
+                statusCode: 400,
+              });
+            }
+          } else {
+            if (p.variantUuid) {
+              throw new CustomError({
+                message: `Produk ${baseProduct.name} tidak memiliki varian, jangan kirim variantUuid`,
+                statusCode: 400,
+              });
+            }
+          }
+
+          updateCustomerProductBundle.push({
+            product: { connect: { uuid: p.uuid } },
+            ...(p.variantUuid && {
+              productVariant: { connect: { uuid: p.variantUuid } },
+              ...(p.deviceId && { deviceId: p.deviceId }),
+            }),
+          });
+        }
+
+        // Update bundle with new product selections
+        return await this.customerProductRepository.updateByUuid({
+          uuid,
+          data: {
+            quantity: dto.quantity,
+            deviceId: dto.deviceId,
+            customerProductBundle: {
+              deleteMany: {}, // Delete existing bundle products
+              create: updateCustomerProductBundle, // Create new bundle products
             },
           },
-        }),
-      },
+        });
+      } else {
+        // Update quantity only without changing bundle products
+        // Validate stock for existing bundle products
+        if (customerProduct.customerProductBundle) {
+          for (const bundleProduct of customerProduct.customerProductBundle) {
+            if (bundleProduct.productVariantId) {
+              const variant = await this.productVariantRepository.getThrowById({
+                id: bundleProduct.productVariantId,
+              });
+
+              const needQty = Number(dto.quantity ?? 1);
+              const stock = Number(variant.stock ?? Infinity);
+              if (isFinite(stock) && stock < needQty) {
+                throw new CustomError({
+                  message: `Stok tidak mencukupi untuk varian ${variant.name}`,
+                  statusCode: 400,
+                });
+              }
+            }
+          }
+        }
+
+        return await this.customerProductRepository.updateByUuid({
+          uuid,
+          data: {
+            quantity: dto.quantity,
+            deviceId: dto.deviceId,
+          },
+        });
+      }
+    }
+
+    throw new CustomError({
+      message: 'Item keranjang tidak valid',
+      statusCode: 400,
     });
   }
 

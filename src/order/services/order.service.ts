@@ -523,6 +523,10 @@ export class OrderService {
         });
       }
 
+      await tx.customerProduct.deleteMany({
+        where: { uuid: { in: dto.carts.map((c) => c.cartUuid) } },
+      });
+
       return createdOrder;
     });
 
