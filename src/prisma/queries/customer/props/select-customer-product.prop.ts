@@ -69,6 +69,8 @@ export const selectCustomerProduct: Prisma.CustomerProductSelect = {
 export const selectCustomerProductForUpdate: Prisma.CustomerProductSelect = {
   productId: true,
   productVariantId: true,
+  bundleId: true,
+  bundle: true,
   product: {
     select: {
       id: true,
