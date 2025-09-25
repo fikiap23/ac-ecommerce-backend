@@ -120,6 +120,7 @@ model CustomerProduct {
 model CustomerProductBundle {
   id               Int             @id @default(autoincrement())
   uuid             String          @unique @default(uuid())
+  deviceId         String?
   product          Product?        @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId        Int?
   productVariant   ProductVariant? @relation(fields: [productVariantId], references: [id])

@@ -197,6 +197,7 @@ export class CustomerProductService {
           product: { connect: { uuid: p.uuid } },
           ...(p.variantUuid && {
             productVariant: { connect: { uuid: p.variantUuid } },
+            ...(p.deviceId && { deviceId: p.deviceId }),
           }),
         });
       }

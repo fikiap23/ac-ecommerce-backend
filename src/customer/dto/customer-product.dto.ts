@@ -18,6 +18,10 @@ export class BundleProductItemDto {
   @IsString()
   @IsOptional()
   variantUuid?: string;
+
+  @IsString()
+  @IsOptional()
+  deviceId?: string;
 }
 
 export class CreateCustomerProductDto {
