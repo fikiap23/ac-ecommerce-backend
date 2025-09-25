@@ -99,6 +99,7 @@ export class OrderService {
         quantity: true,
         deviceId: true,
         bundle: { select: { uuid: true, name: true, minusPrice: true } },
+        product: true,
         productVariant: {
           select: {
             uuid: true,
@@ -116,7 +117,6 @@ export class OrderService {
     });
 
     const carts = this.orderRepository.mapToCarts(cart);
-    console.log('carts', dto.carts);
 
     // === Ambil produk aktif buat validasi & harga ===
     const products = await this.productRepository.getMany({
@@ -126,8 +126,6 @@ export class OrderService {
       },
       select: selectProductForCreateOrder,
     });
-
-    console.log('products', products);
 
     // Validasi produk + variant (pakai repo validasi kamu)
     await this.orderValidateRepository.validateProductsWithVariants(

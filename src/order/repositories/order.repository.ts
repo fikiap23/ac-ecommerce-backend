@@ -510,7 +510,7 @@ export class OrderRepository {
       // single biasa
       return [
         {
-          productUuid: item.productVariant?.product?.uuid ?? '',
+          productUuid: item.productVariant?.product?.uuid ?? item.product?.uuid,
           quantity,
           deviceId: item.deviceId ?? null,
           productVariantUuid: item.productVariant?.uuid ?? null,

@@ -256,6 +256,8 @@ export const selectOrderByUuid: Prisma.OrderSelect = {
       name: true,
       quantity: true,
       price: true,
+      bundleGroupId: true,
+      sourcePackageType: true,
       orderProductImage: {
         select: {
           uuid: true,
