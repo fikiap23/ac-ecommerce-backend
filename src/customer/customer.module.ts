@@ -49,6 +49,7 @@ import { CustomerVoucherRepository } from './repositories/customer-voucher.repos
     CustomerAddressRepository,
     CustomerProfileService,
     CustomerVoucherRepository,
+    CustomerProductRepository,
   ],
   controllers: [CustomerController],
 })
