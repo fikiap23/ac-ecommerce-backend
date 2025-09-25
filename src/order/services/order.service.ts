@@ -57,6 +57,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { CustomerVoucherRepository } from 'src/customer/repositories/customer-voucher.repository';
 import { OrderProductRepository } from '../repositories/order-product.repository';
 import { BundleRepository } from 'src/product/repositories/bundle.repository';
+import { CustomerProductRepository } from 'src/customer/repositories/customer-product.repository';
 
 @Injectable()
 export class OrderService {
@@ -74,6 +75,7 @@ export class OrderService {
     private readonly customerVoucher: CustomerVoucherRepository,
     private readonly orderProductRepository: OrderProductRepository,
     private readonly bundleRepository: BundleRepository,
+    private readonly customerProductRepository: CustomerProductRepository,
   ) {}
 
   async validateMembership(authorization: string) {
@@ -105,29 +107,21 @@ export class OrderService {
 
       // Conditional bundle query
       bundleCarts.length > 0
-        ? this.bundleRepository.getMany({
+        ? this.customerProductRepository.getMany({
             where: {
               uuid: { in: bundleCarts.map((c) => c.bundleUuid) },
-              isActive: true,
             },
             select: {
               id: true,
               uuid: true,
-              name: true,
-              isActive: true,
-              countTotalSale: true,
-              description: true,
-              isHide: true,
-              minusPrice: true,
-              price: true,
-              rating: true,
-              salePrice: true,
-              items: {
+              customerProductBundle: {
                 include: {
-                  product: true,
+                  product: {
+                    select: selectProductForCreateOrder,
+                  },
+                  productVariant: true,
                 },
               },
-              bundleImage: true,
             },
           })
         : Promise.resolve([]),
@@ -138,8 +132,8 @@ export class OrderService {
       ...bundle,
       serviceType: 'BUNDLE',
       packageType: 'BUNDLE',
-      productVariant: [],
-      productImage: bundle.bundleImage || [],
+      productVariant: bundle.customerProductBundle.productVariant,
+      productImage: bundle.customerProductBundle.product.productImage || [],
       type: null,
       model: null,
       capacity: null,
