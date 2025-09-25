@@ -19,7 +19,7 @@ export class BannerCampaignService {
     this.bannerCampaignValidateRepository.validateImage(image);
     const urlImage = await this.bannerCampaignRepository.uploadImage(image);
     return await this.bannerCampaignRepository.create({
-      data: { title: dto.title, image: urlImage },
+      data: { title: dto.title, image: urlImage, type: dto.type },
     });
   }
 
@@ -55,6 +55,7 @@ export class BannerCampaignService {
       data: {
         title: dto.title,
         image: urlImage,
+        type: dto.type,
       },
     });
   }

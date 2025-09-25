@@ -10,7 +10,8 @@ import { whereBannerCampaignGetManyPaginate } from 'src/prisma/queries/banner-ca
 import { CustomError } from 'helpers/http.helper';
 import { GatewayService } from 'src/gateway/services/gateway.service';
 import { genIdPrefixTimestamp, genSlug } from 'helpers/data.helper';
-import { CreateFileStorageBucketDto } from 'src/gateway/dto/gateway-storage-bucket.dto';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 @Injectable()
 export class BannerCampaignRepository {
@@ -26,20 +27,36 @@ export class BannerCampaignRepository {
     */
 
   async uploadImage(image: Express.Multer.File) {
-    const fileName = genIdPrefixTimestamp(genSlug(image.originalname));
-    const arg: CreateFileStorageBucketDto = {
-      name: fileName,
-      access: 'PUBLIC',
-      tribe: process.env.TRIBE_STORAGE_BUCKET,
-      service: 'e-commerce/',
-      module: 'banner-campaign/',
-      subFolder: 'images/',
-      file: image,
-    };
-    if (process.env.STORAGE_ENABLE === 'true') {
-      await this.gatewayService.httpPostFile(arg);
+    // Buat nama file unik
+    const ext = path.extname(image.originalname) || '';
+    const base = genSlug(image.originalname.replace(ext, ''));
+    const fileName = `${genIdPrefixTimestamp(base)}${ext.toLowerCase()}`;
+
+    // Simpan ke filesystem di bawah /public/upload/...
+    const fsDir = path.join(
+      process.cwd(),
+      'public',
+      'upload',
+      'banner-campaign',
+      'images',
+    );
+    const absPath = path.join(fsDir, fileName);
+
+    await fs.mkdir(fsDir, { recursive: true });
+
+    // Ambil konten dari buffer (memoryStorage) atau dari path (diskStorage)
+    const content =
+      image.buffer ?? (image.path ? await fs.readFile(image.path) : null);
+
+    if (!content) {
+      throw new Error('Tidak ada konten file yang bisa disimpan.');
     }
-    return `${process.env.BASE_URL_STORAGE_BUCKET}/files/public/${fileName}`;
+
+    await fs.writeFile(absPath, content);
+
+    // Kembalikan URL relatif tanpa prefix /public
+    const urlPath = `/upload/banner-campaign/images/${fileName}`;
+    return urlPath;
   }
 
   async deleteImage(image: string) {
