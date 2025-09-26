@@ -77,9 +77,6 @@ export class ProductQuery extends PrismaService {
     const lastPage = Math.ceil(total / limit);
     const skip = (page - 1) * limit;
 
-    console.log(filter, 'filter');
-    console.log(parseFormBoolean(filter?.isActive), 'isActive');
-
     // get product + bundle
     const [products, bundles] = await Promise.all([
       prisma.product.findMany({

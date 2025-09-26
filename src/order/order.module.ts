@@ -17,6 +17,8 @@ import { OrderProductRepository } from './repositories/order-product.repository'
 import { OrderCallbackPaymentRepository } from './repositories/order-callback-payment.repository';
 import { OrderDeliveryServiceRepository } from './repositories/order-delivery-service.repository';
 import { OrderPaymentMethodRepository } from './repositories/order-payment-method.repository';
+import { TechnicianModule } from 'src/technician/technician.module';
+import { DriverModule } from 'src/driver/driver.module';
 
 @Module({
   imports: [
@@ -32,6 +34,8 @@ import { OrderPaymentMethodRepository } from './repositories/order-payment-metho
     VoucherModule,
     forwardRef(() => CustomerModule),
     MailModule,
+    TechnicianModule,
+    DriverModule,
   ],
   providers: [
     OrderDeliveryServiceRepository,

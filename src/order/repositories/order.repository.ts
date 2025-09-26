@@ -485,6 +485,12 @@ export class OrderRepository {
     bundleGroupId?: string | null;
     bundleName?: string | null;
     minusPrice?: number | null;
+    bundleImage?: string | null;
+    variantUuid?: string | null;
+    variantId?: number | null;
+    variantName?: string | null;
+    variantCode?: string | null;
+    variantImage?: string | null;
   }[] {
     return cart.flatMap((item: any) => {
       const quantity = item.quantity ?? 1;
@@ -497,16 +503,24 @@ export class OrderRepository {
         const groupId = String(item.bundle.uuid || null);
         const bundleName = item.bundle.name || null;
         const minusPrice = item.bundle.minusPrice || null;
+        const bundleImage = item.bundle?.bundleImage[0]?.url || null;
 
         return item.customerProductBundle.map((b: any) => ({
           productUuid: b.product?.uuid ?? '',
           quantity,
           deviceId: b.deviceId ?? item.deviceId ?? null,
           productVariantUuid: b.productVariant?.uuid ?? null,
+          variantUuid: b.productVariant?.uuid ?? null,
+          variantId: b.productVariant?.id ?? null,
+          variantName: b.productVariant?.name ?? null,
+          variantCode: b.productVariant?.code ?? null,
+          variantImage:
+            b.productVariant?.photoUrl ?? b.product?.productImage[0]?.url,
           sourcePackageType: 'BUNDLE',
           bundleGroupId: groupId || null,
           bundleName: bundleName || null,
           minusPrice: minusPrice || null,
+          bundleImage: bundleImage || null,
         }));
       }
 
@@ -521,6 +535,14 @@ export class OrderRepository {
           bundleGroupId: null,
           bundleName: null,
           minusPrice: null,
+          bundleImage: null,
+          variantUuid: item.productVariant?.uuid ?? null,
+          variantId: item.productVariant?.id ?? null,
+          variantName: item.productVariant?.name ?? null,
+          variantCode: item.productVariant?.code ?? null,
+          variantImage:
+            item.productVariant?.photoUrl ??
+            item?.product?.productImage[0]?.url,
         },
       ];
     });

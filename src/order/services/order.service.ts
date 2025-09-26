@@ -18,7 +18,9 @@ import {
 import { GatewayService } from 'src/gateway/services/gateway.service';
 import {
   Customer,
+  Driver,
   OrderProduct,
+  Prisma,
   TypeProductPackage,
   TypeProductService,
   TypeStatusOrder,
@@ -58,6 +60,8 @@ import { CustomerVoucherRepository } from 'src/customer/repositories/customer-vo
 import { OrderProductRepository } from '../repositories/order-product.repository';
 import { BundleRepository } from 'src/product/repositories/bundle.repository';
 import { CustomerProductRepository } from 'src/customer/repositories/customer-product.repository';
+import { TechnicianRepository } from 'src/technician/repositories/technician.repository';
+import { DriverRepository } from 'src/driver/repositories/driver.repository';
 
 @Injectable()
 export class OrderService {
@@ -76,6 +80,8 @@ export class OrderService {
     private readonly orderProductRepository: OrderProductRepository,
     private readonly bundleRepository: BundleRepository,
     private readonly customerProductRepository: CustomerProductRepository,
+    private readonly technicianRepository: TechnicianRepository,
+    private readonly driverRepository: DriverRepository,
   ) {}
 
   async validateMembership(authorization: string) {
@@ -98,19 +104,53 @@ export class OrderService {
         uuid: true,
         quantity: true,
         deviceId: true,
-        bundle: { select: { uuid: true, name: true, minusPrice: true } },
-        product: true,
-        productVariant: {
+        bundle: {
           select: {
             uuid: true,
+            name: true,
+            minusPrice: true,
+            bundleImage: {
+              select: {
+                url: true,
+              },
+            },
+          },
+        },
+        product: {
+          select: {
+            uuid: true,
+            name: true,
+            productImage: {
+              select: {
+                url: true,
+              },
+            },
+          },
+        },
+        productVariant: {
+          select: {
+            id: true,
+            uuid: true,
+            photoUrl: true,
+            name: true,
+            code: true,
             product: { select: { uuid: true } },
           },
         },
         customerProductBundle: {
           select: {
             deviceId: true,
-            product: { select: { uuid: true, name: true } },
-            productVariant: { select: { uuid: true, name: true } },
+            product: { select: { uuid: true, name: true, productImage: true } },
+            productVariant: {
+              select: {
+                id: true,
+                uuid: true,
+                photoUrl: true,
+                name: true,
+                code: true,
+                product: { select: { uuid: true, productImage: true } },
+              },
+            },
           },
         },
       },
@@ -405,7 +445,7 @@ export class OrderService {
 
           // Penting: create berdasarkan DTO CARTS (bukan products.map)
           orderProduct: {
-            create: carts.map((ci: any) => {
+            create: carts.map((ci) => {
               const p = productByUuid.get(ci.productUuid);
               if (!p) {
                 throw new CustomError({
@@ -470,10 +510,19 @@ export class OrderService {
                 createdAt: new Date(),
                 updatedAt: new Date(),
 
+                // variant
+                variantId: ci.variantId ?? null,
+                variantUuid: ci.variantUuid ?? null,
+                variantCode: ci.variantCode ?? null,
+                variantName: ci.variantName ?? null,
+                variantImage: ci.variantImage ?? null,
+
+                // bunde
                 sourcePackageType: ci.sourcePackageType ?? 'SINGLE',
                 bundleGroupId: ci.bundleGroupId ?? null,
                 bundleName: ci.bundleName ?? null,
                 minusPrice: ci.minusPrice ?? null,
+                bundleImage: ci.bundleImage ?? null,
 
                 orderProductImage: {
                   create: (p.productImage ?? []).map((pi: any) => ({
@@ -1091,7 +1140,14 @@ export class OrderService {
   }
 
   async updateOrderStatus(dto: UpdateOrderStatusDto) {
-    const { orderUuid, productOrders, scheduleAt, ...rest } = dto;
+    const {
+      orderUuid,
+      productOrders,
+      scheduleAt,
+      technicianUuid,
+      driverUuid,
+      ...rest
+    } = dto;
 
     // Validasi scheduleAt
     const scheduleAtDate = scheduleAt ? new Date(scheduleAt) : undefined;
@@ -1102,40 +1158,61 @@ export class OrderService {
       });
     }
 
-    type OrderUpdateInput = {
-      status?: TypeStatusOrder;
-      technicianUuid?: string | null;
-      driverUuid?: string | null;
-      notes?: string | null;
-      scheduleAt?: Date | null;
-    };
-
     return this.prismaService.execTx(async (tx) => {
-      // Check order
+      // Pastikan order ada
       const order = await this.orderRepository.getThrowByUuid({
         uuid: orderUuid,
-        select: selectGeneralOrder,
+        select: { id: true },
         tx,
       });
 
-      const data: OrderUpdateInput = {
+      // Resolve technician by UUID -> id & name
+      let techId: number | undefined;
+      let techName: string | undefined;
+      if (technicianUuid) {
+        const tech = await this.technicianRepository.getThrowByUuid({
+          uuid: technicianUuid,
+          select: { id: true, name: true },
+          tx,
+        });
+        techId = tech.id;
+        techName = tech.name ?? null;
+      }
+
+      // Resolve driver by UUID -> id & name
+      let drvId: number | undefined;
+      let drvName: string | undefined;
+      if (driverUuid) {
+        const drv = await this.driverRepository.getThrowByUuid({
+          uuid: driverUuid,
+          select: { id: true, name: true },
+          tx,
+        });
+        drvId = drv.id;
+        drvName = drv.name ?? null;
+      }
+
+      // Bangun payload update sesuai kolom model Order
+      const data: Prisma.OrderUpdateInput = {
         status: rest.status,
-        technicianUuid: rest.technicianUuid,
-        driverUuid: rest.driverUuid,
-        notes: rest.notes,
-        scheduleAt: scheduleAtDate,
+        notes: rest.notes ?? undefined,
+        scheduledAt: scheduleAtDate ?? undefined,
+        ...(techId !== undefined ? { technicianId: techId } : {}),
+        ...(techName !== undefined ? { technicianName: techName } : {}),
+        ...(drvId !== undefined ? { driverId: drvId } : {}),
+        ...(drvName !== undefined ? { driverName: drvName } : {}),
       };
 
+      // Update order
       await this.orderRepository.update({
         where: { uuid: orderUuid },
         data,
         tx,
       });
 
-      // Update productOrders
+      // Update productOrders.deviceId (validasi milik order yang sama)
       if (productOrders?.length) {
         const ids = productOrders.map((p) => p.orderProductUuid);
-
         const found = await this.orderProductRepository.getMany({
           where: { orderId: order.id, uuid: { in: ids } },
           select: { uuid: true },
@@ -1146,7 +1223,6 @@ export class OrderService {
         const invalid = productOrders.filter(
           (p) => !validSet.has(p.orderProductUuid),
         );
-
         if (invalid.length > 0) {
           throw new CustomError({
             message: `orderProductUuid tidak valid: ${invalid

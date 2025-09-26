@@ -455,24 +455,29 @@ model OrderAddress {
 }
 
 model OrderProduct {
-  id          Int                 @id @default(autoincrement())
-  uuid        String              @unique @default(uuid())
-  packageType TypeProductPackage?
-  serviceType TypeProductService?
-  deviceId    String?
-  name        String
-  brand       String?
-  description String              @db.Text
-  type        String?
-  model       String?
-  capacity    String?
-  price       Int
-  category    String?
-  quantity    Int
-  discount    Int
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-  deletedAt   DateTime?
+  id           Int                 @id @default(autoincrement())
+  uuid         String              @unique @default(uuid())
+  packageType  TypeProductPackage?
+  serviceType  TypeProductService?
+  deviceId     String?
+  name         String
+  brand        String?
+  description  String              @db.Text
+  type         String?
+  model        String?
+  capacity     String?
+  variantName  String?
+  variantCode  String?
+  variantImage String?
+  variantId    Int?
+  variantUuid  String?
+  price        Int
+  category     String?
+  quantity     Int
+  discount     Int
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  deletedAt    DateTime?
 
   orderProductImage OrderProductImage[]
 
@@ -486,6 +491,7 @@ model OrderProduct {
   sourcePackageType TypeProductPackage?
   bundleGroupId     String?
   minusPrice        Int?
+  bundleImage       String?
 }
 
 model OrderProductImage {

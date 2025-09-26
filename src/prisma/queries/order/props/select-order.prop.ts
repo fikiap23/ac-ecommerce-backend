@@ -69,6 +69,12 @@ export const selectGeneralOrder: Prisma.OrderSelect = {
       sourcePackageType: true,
       bundleName: true,
       minusPrice: true,
+      bundleImage: true,
+      variantId: true,
+      variantUuid: true,
+      variantName: true,
+      variantCode: true,
+      variantImage: true,
       orderProductImage: {
         select: {
           url: true,
@@ -119,6 +125,12 @@ export const selectGeneralListOrders: Prisma.OrderSelect = {
       bundleGroupId: true,
       bundleName: true,
       minusPrice: true,
+      bundleImage: true,
+      variantId: true,
+      variantUuid: true,
+      variantName: true,
+      variantCode: true,
+      variantImage: true,
     },
   },
   totalPayment: true,
@@ -154,6 +166,12 @@ export const selectGeneralTrackOrder: Prisma.OrderSelect = {
       sourcePackageType: true,
       bundleName: true,
       minusPrice: true,
+      bundleImage: true,
+      variantId: true,
+      variantUuid: true,
+      variantName: true,
+      variantCode: true,
+      variantImage: true,
       orderProductImage: {
         select: {
           uuid: true,
@@ -217,6 +235,12 @@ export const selectTrackIdAndStatus: Prisma.OrderSelect = {
       sourcePackageType: true,
       bundleName: true,
       minusPrice: true,
+      bundleImage: true,
+      variantId: true,
+      variantUuid: true,
+      variantName: true,
+      variantCode: true,
+      variantImage: true,
       orderProductImage: {
         select: {
           url: true,
@@ -283,6 +307,12 @@ export const selectOrderByUuid: Prisma.OrderSelect = {
       sourcePackageType: true,
       bundleName: true,
       minusPrice: true,
+      bundleImage: true,
+      variantId: true,
+      variantUuid: true,
+      variantName: true,
+      variantCode: true,
+      variantImage: true,
       orderProductImage: {
         select: {
           uuid: true,
@@ -334,6 +364,13 @@ export const selectGeneralTrackOrderUuid: Prisma.OrderSelect = {
       sourcePackageType: true,
       bundleName: true,
       minusPrice: true,
+      bundleImage: true,
+      variantId: true,
+      variantUuid: true,
+      variantName: true,
+      variantCode: true,
+      variantImage: true,
+
       orderProductImage: {
         select: {
           uuid: true,
