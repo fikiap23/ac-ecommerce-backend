@@ -484,19 +484,19 @@ export class OrderRepository {
     sourcePackageType: 'SINGLE' | 'BUNDLE';
     bundleGroupId?: string | null;
     bundleName?: string | null;
+    minusPrice?: number | null;
   }[] {
     return cart.flatMap((item: any) => {
       const quantity = item.quantity ?? 1;
 
-      // jika bundle → pecah + beri identitas grup
       if (
         Array.isArray(item.customerProductBundle) &&
         item.customerProductBundle.length > 0
       ) {
         // pakai customerProductId sebagai group id (string-kan saja)
-        const groupId = String(
-          item.customerProductBundle[0]?.customerProductId ?? item.uuid ?? '',
-        );
+        const groupId = String(item.bundle.uuid || null);
+        const bundleName = item.bundle.name || null;
+        const minusPrice = item.bundle.minusPrice || null;
 
         return item.customerProductBundle.map((b: any) => ({
           productUuid: b.product?.uuid ?? '',
@@ -505,7 +505,8 @@ export class OrderRepository {
           productVariantUuid: b.productVariant?.uuid ?? null,
           sourcePackageType: 'BUNDLE',
           bundleGroupId: groupId || null,
-          bundleName: item.name || null,
+          bundleName: bundleName || null,
+          minusPrice: minusPrice || null,
         }));
       }
 
@@ -519,6 +520,7 @@ export class OrderRepository {
           sourcePackageType: 'SINGLE',
           bundleGroupId: null,
           bundleName: null,
+          minusPrice: null,
         },
       ];
     });

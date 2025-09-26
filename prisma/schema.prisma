@@ -405,6 +405,7 @@ model Order {
   xenditFee             Int?            @default(0)
   xenditFeeVat          Int?            @default(0)
   netAmount             Int?            @default(0)
+  discountBundle        Int?            @default(0)
   isNetAmountCalculated Boolean?        @default(false)
   customerId            Int?
   voucherId             Int?
@@ -484,6 +485,7 @@ model OrderProduct {
   bundleName        String?
   sourcePackageType TypeProductPackage?
   bundleGroupId     String?
+  minusPrice        Int?
 }
 
 model OrderProductImage {

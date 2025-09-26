@@ -398,6 +398,7 @@ export class OrderService {
           deliveryFee,
           totalPayment,
           customerId: customer.id,
+          discountBundle: minusPrice,
 
           orderAddress: { create: dto.shippingAddress },
           recipientAddress: { create: dto.recipientAddress },
