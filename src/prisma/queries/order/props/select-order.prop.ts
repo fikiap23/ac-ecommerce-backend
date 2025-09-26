@@ -63,6 +63,7 @@ export const selectGeneralOrder: Prisma.OrderSelect = {
       orderId: true,
       bundleGroupId: true,
       sourcePackageType: true,
+      bundleName: true,
       orderProductImage: {
         select: {
           url: true,
@@ -110,6 +111,7 @@ export const selectGeneralListOrders: Prisma.OrderSelect = {
       price: true,
       sourcePackageType: true,
       bundleGroupId: true,
+      bundleName: true,
     },
   },
   totalPayment: true,
@@ -142,6 +144,7 @@ export const selectGeneralTrackOrder: Prisma.OrderSelect = {
       price: true,
       bundleGroupId: true,
       sourcePackageType: true,
+      bundleName: true,
       orderProductImage: {
         select: {
           uuid: true,
@@ -201,6 +204,7 @@ export const selectTrackIdAndStatus: Prisma.OrderSelect = {
       quantity: true,
       bundleGroupId: true,
       sourcePackageType: true,
+      bundleName: true,
       orderProductImage: {
         select: {
           url: true,
@@ -264,6 +268,7 @@ export const selectOrderByUuid: Prisma.OrderSelect = {
       price: true,
       bundleGroupId: true,
       sourcePackageType: true,
+      bundleName: true,
       orderProductImage: {
         select: {
           uuid: true,
@@ -312,6 +317,7 @@ export const selectGeneralTrackOrderUuid: Prisma.OrderSelect = {
       price: true,
       bundleGroupId: true,
       sourcePackageType: true,
+      bundleName: true,
       orderProductImage: {
         select: {
           uuid: true,

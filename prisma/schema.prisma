@@ -481,6 +481,7 @@ model OrderProduct {
   order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderId Int
 
+  bundleName        String?
   sourcePackageType TypeProductPackage?
   bundleGroupId     String?
 }

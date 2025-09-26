@@ -483,6 +483,7 @@ export class OrderRepository {
     productVariantUuid?: string | null;
     sourcePackageType: 'SINGLE' | 'BUNDLE';
     bundleGroupId?: string | null;
+    bundleName?: string | null;
   }[] {
     return cart.flatMap((item: any) => {
       const quantity = item.quantity ?? 1;
@@ -504,6 +505,7 @@ export class OrderRepository {
           productVariantUuid: b.productVariant?.uuid ?? null,
           sourcePackageType: 'BUNDLE',
           bundleGroupId: groupId || null,
+          bundleName: item.name || null,
         }));
       }
 
@@ -516,6 +518,7 @@ export class OrderRepository {
           productVariantUuid: item.productVariant?.uuid ?? null,
           sourcePackageType: 'SINGLE',
           bundleGroupId: null,
+          bundleName: null,
         },
       ];
     });
