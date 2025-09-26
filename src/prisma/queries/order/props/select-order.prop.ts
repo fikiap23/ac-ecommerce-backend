@@ -61,6 +61,8 @@ export const selectGeneralOrder: Prisma.OrderSelect = {
       deletedAt: true,
       orderProductId: true,
       orderId: true,
+      bundleGroupId: true,
+      sourcePackageType: true,
       orderProductImage: {
         select: {
           url: true,
@@ -138,6 +140,8 @@ export const selectGeneralTrackOrder: Prisma.OrderSelect = {
       quantity: true,
       name: true,
       price: true,
+      bundleGroupId: true,
+      sourcePackageType: true,
       orderProductImage: {
         select: {
           uuid: true,
@@ -195,6 +199,8 @@ export const selectTrackIdAndStatus: Prisma.OrderSelect = {
       name: true,
       price: true,
       quantity: true,
+      bundleGroupId: true,
+      sourcePackageType: true,
       orderProductImage: {
         select: {
           url: true,
@@ -304,6 +310,8 @@ export const selectGeneralTrackOrderUuid: Prisma.OrderSelect = {
       quantity: true,
       name: true,
       price: true,
+      bundleGroupId: true,
+      sourcePackageType: true,
       orderProductImage: {
         select: {
           uuid: true,
