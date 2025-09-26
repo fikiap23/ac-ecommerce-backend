@@ -473,6 +473,7 @@ export class OrderService {
                 sourcePackageType: ci.sourcePackageType ?? 'SINGLE',
                 bundleGroupId: ci.bundleGroupId ?? null,
                 bundleName: ci.bundleName ?? null,
+                minusPrice: ci.minusPrice ?? null,
 
                 orderProductImage: {
                   create: (p.productImage ?? []).map((pi: any) => ({
