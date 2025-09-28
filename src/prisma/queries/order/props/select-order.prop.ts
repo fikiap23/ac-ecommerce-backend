@@ -427,6 +427,10 @@ export const selectOrderProductDevice: Prisma.OrderProductSelect = {
   uuid: true,
   name: true,
   variantName: true,
+  variantCode: true,
+  variantImage: true,
+  bundleImage: true,
+  orderProductImage: true,
   deviceId: true,
   createdAt: true,
 };
