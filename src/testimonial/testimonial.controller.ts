@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpStatus,
   Param,
   Post,
@@ -16,37 +17,37 @@ import {
 import { TestimonialService } from './services/testimonial.service';
 import { JwtGuard, RoleGuard } from 'src/auth/guard';
 import { Roles } from 'src/auth/decorator';
-import { TypeRoleAdmin } from '@prisma/client';
+import { TypeRoleAdmin, TypeRoleUser } from '@prisma/client';
 import {
   CreateTestimonialDto,
   UpdateTestimonialDto,
 } from './dto/testimonial.dto';
 import { formatResponse } from 'helpers/http.helper';
-import {
-  errorHandler,
-  videoOrImageFileFilter,
-} from 'helpers/validation.helper';
+import { errorHandler } from 'helpers/validation.helper';
 import { Response } from 'express';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { SearchPaginationDto } from 'utils/dto/pagination.dto';
+import { AuthService } from 'src/auth/auth.service';
 
 @Controller('testimonial')
 export class TestimonialController {
-  constructor(private readonly testimonialService: TestimonialService) {}
+  constructor(
+    private readonly testimonialService: TestimonialService,
+    private readonly authService: AuthService,
+  ) {}
 
   @UseGuards(JwtGuard, RoleGuard)
-  @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN)
+  @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN, TypeRoleUser.CUSTOMER)
   @Post()
-  @UseInterceptors(
-    FileInterceptor('videoOrImage', { fileFilter: videoOrImageFileFilter }),
-  )
   async create(
-    @UploadedFile() videoOrImage: Express.Multer.File,
     @Body() dto: CreateTestimonialDto,
+    @Headers('authorization') authorization: string,
     @Res() res: Response,
   ) {
     try {
-      await this.testimonialService.create(dto, videoOrImage);
+      const { sub, role } = await this.authService.decodeJwtToken(
+        authorization,
+      );
+      await this.testimonialService.create(sub, role, dto);
       return formatResponse(res, HttpStatus.CREATED, null);
     } catch (error) {
       errorHandler(res, error);
@@ -84,17 +85,13 @@ export class TestimonialController {
   @UseGuards(JwtGuard, RoleGuard)
   @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN)
   @Put(':uuid')
-  @UseInterceptors(
-    FileInterceptor('videoOrImage', { fileFilter: videoOrImageFileFilter }),
-  )
   async updateTestimonialByUuid(
     @Param('uuid') uuid: string,
     @Body() dto: UpdateTestimonialDto,
     @Res() res: Response,
-    @UploadedFile() videoOrImage?: Express.Multer.File,
   ) {
     try {
-      await this.testimonialService.updateByUuid(uuid, dto, videoOrImage);
+      await this.testimonialService.update(uuid, dto);
       return formatResponse(res, HttpStatus.OK, null);
     } catch (error) {
       errorHandler(res, error);

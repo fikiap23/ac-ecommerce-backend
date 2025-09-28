@@ -7,6 +7,10 @@ import { HttpModule } from '@nestjs/axios';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { GatewayModule } from 'src/gateway/gateway.module';
 import { TestimonialValidateRepository } from './repositories/testimonial-validate.repository';
+import { UserManagementModule } from 'src/user-management/user-management.module';
+import { CustomerModule } from 'src/customer/customer.module';
+import { ProductModule } from 'src/product/product.module';
+import { AuthModule } from 'src/auth/auth.module';
 
 @Module({
   imports: [
@@ -17,6 +21,10 @@ import { TestimonialValidateRepository } from './repositories/testimonial-valida
     }),
     PrismaModule,
     GatewayModule,
+    UserManagementModule,
+    CustomerModule,
+    ProductModule,
+    AuthModule,
   ],
   providers: [
     TestimonialService,

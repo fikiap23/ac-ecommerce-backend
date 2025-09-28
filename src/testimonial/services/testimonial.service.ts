@@ -6,26 +6,51 @@ import {
 } from '../dto/testimonial.dto';
 import { IFilterTestimonial } from '../interface/testimonial.interface';
 import { selectGeneralTestimonial } from 'src/prisma/queries/testimonial/props/select-testimonial.prop';
-import { TestimonialValidateRepository } from '../repositories/testimonial-validate.repository';
+import { UserManagementRepository } from 'src/user-management/repositories/user-management.repository';
+import { CustomerRepository } from 'src/customer/repositories/customer.repository';
+import { ProductRepository } from 'src/product/repositories/product.repository';
 
 @Injectable()
 export class TestimonialService {
   constructor(
     private readonly testimonialRepository: TestimonialRepository,
-    private readonly testimonialValidateRepository: TestimonialValidateRepository,
+    private readonly userRepository: UserManagementRepository,
+    private readonly customerRepository: CustomerRepository,
+    private readonly productRepository: ProductRepository,
   ) {}
 
-  async create(dto: CreateTestimonialDto, videoOrImage: Express.Multer.File) {
-    this.testimonialValidateRepository.validateVideoOrImage(videoOrImage);
+  async create(sub: string, role: string, dto: CreateTestimonialDto) {
+    let userId: number | null = null;
+    if (role === 'ADMIN' || role === 'SUPER_ADMIN') {
+      const user = await this.userRepository.getThrowByUuid({ uuid: sub });
+      userId = user.id;
+    } else {
+      const customer = await this.customerRepository.getThrowByUuid({
+        uuid: sub,
+      });
+      userId = customer.id;
+    }
 
-    const videoOrImageUrl = await this.testimonialRepository.uploadVideoOrImage(
-      videoOrImage,
-    );
+    const product = await this.productRepository.getThrowByUuid({
+      uuid: dto.productUuid,
+    });
+
     const { ...cleanDto } = dto;
     return await this.testimonialRepository.create({
       data: {
-        ...cleanDto,
-        videoOrImage: videoOrImageUrl,
+        cityOrDistrict: cleanDto.cityOrDistrict,
+        description: cleanDto.description,
+        name: cleanDto.name,
+        productDescription: cleanDto.productDescription,
+        createdBy: role,
+        rating: cleanDto.rating,
+        status: cleanDto.status,
+        userId,
+        product: {
+          connect: {
+            id: product.id,
+          },
+        },
       },
     });
   }
@@ -44,35 +69,41 @@ export class TestimonialService {
     });
   }
 
-  async updateByUuid(
-    uuid: string,
-    dto: UpdateTestimonialDto,
-    videoOrImage?: Express.Multer.File,
-  ) {
-    const existing = await this.testimonialRepository.getThrowByUuid({ uuid });
+  async update(uuid: string, dto: UpdateTestimonialDto) {
+    // pastikan testimonial ada
+    await this.testimonialRepository.getThrowByUuid({
+      uuid,
+      select: { id: true },
+    });
 
-    let videoOrImageUrl: string | undefined;
-    if (videoOrImage) {
-      await this.testimonialRepository.deleteVideoOrImage(
-        existing.videoOrImage,
-      );
-      videoOrImageUrl = await this.testimonialRepository.uploadVideoOrImage(
-        videoOrImage,
-      );
+    // jika productUuid diubah, validasi & siapkan connect
+    let productConnect: { product: { connect: { id: number } } } | undefined =
+      undefined;
+
+    if (dto.productUuid) {
+      const product = await this.productRepository.getThrowByUuid({
+        uuid: dto.productUuid,
+        select: { id: true },
+      });
+      productConnect = { product: { connect: { id: product.id } } };
     }
-    const { ...cleanDto } = dto;
-    return await this.testimonialRepository.updateByUuid({
+
+    return this.testimonialRepository.updateByUuid({
       uuid,
       data: {
-        ...cleanDto,
-        videoOrImage: videoOrImageUrl,
+        name: dto.name,
+        cityOrDistrict: dto.cityOrDistrict,
+        productDescription: dto.productDescription,
+        description: dto.description,
+        rating: dto.rating,
+        status: dto.status,
+        ...(productConnect ?? {}),
       },
     });
   }
 
   async deleteByUuid(uuid: string) {
-    const existing = await this.testimonialRepository.getThrowByUuid({ uuid });
-    await this.testimonialRepository.deleteVideoOrImage(existing.videoOrImage);
+    await this.testimonialRepository.getThrowByUuid({ uuid });
     return await this.testimonialRepository.deleteByUuid({ uuid });
   }
 }

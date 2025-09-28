@@ -1,5 +1,12 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { IsNotEmpty, IsString, Length } from 'class-validator';
+import { TypeStatusTestimonial } from '@prisma/client';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class CreateTestimonialDto {
   @IsString()
@@ -17,6 +24,18 @@ export class CreateTestimonialDto {
   @IsString()
   @IsNotEmpty()
   description: string;
+
+  @IsNotEmpty()
+  @IsString()
+  productUuid: string;
+
+  @IsNotEmpty()
+  @IsNumber()
+  rating: number;
+
+  @IsOptional()
+  @IsEnum(TypeStatusTestimonial)
+  status?: TypeStatusTestimonial;
 }
 
 export class UpdateTestimonialDto extends PartialType(CreateTestimonialDto) {}
