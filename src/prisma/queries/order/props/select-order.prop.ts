@@ -269,30 +269,79 @@ export const selectTrackIdAndStatus: Prisma.OrderSelect = {
 };
 
 export const selectOrderByUuid: Prisma.OrderSelect = {
+  // identifiers
   id: true,
+  uuid: true,
+  trackId: true,
+  createdAt: true,
+  updatedAt: true,
+
+  // customer & voucher
+  customerId: true,
   voucherId: true,
   exchangePoint: true,
-  customerId: true,
-  paymentMethod: true,
-  uuid: true,
-  createdAt: true,
-  trackId: true,
+
+  // contact
   name: true,
+  email: true,
+  phoneNumber: true,
+
+  // payment & shipping
+  paymentMethod: true,
+  deliveryService: true,
+  totalWeight: true,
+
+  // money
+  cashback: true,
+  subTotalPay: true,
+  voucherDiscount: true,
+  deliveryFee: true,
+  totalPayment: true,
+  xenditFee: true,
+  xenditFeeVat: true,
+  netAmount: true,
+  discountBundle: true,
+  isNetAmountCalculated: true,
+
+  // status & timing
+  status: true,
+  scheduledAt: true,
+  expiredAt: true,
+
+  // assignment
   driverId: true,
   driverName: true,
   technicianId: true,
   technicianName: true,
-  deliveryService: true,
-  recipientAddress: true,
-  notes: true,
-  scheduledAt: true,
-  discountBundle: true,
 
-  orderAddress: {
+  // NEW service-complete fields
+  task: true,
+  remarks: true,
+  freonBefore: true,
+  freonAfter: true,
+  tempBefore: true,
+  tempAfter: true,
+  currentBefore: true,
+  currentAfter: true,
+
+  // notes
+  notes: true,
+
+  // address
+  orderAddress: { select: { address: true } },
+  recipientAddress: true,
+
+  // images (NEW relation)
+  images: {
     select: {
-      address: true,
+      uuid: true,
+      url: true,
+      isMain: true,
+      createdAt: true,
     },
   },
+
+  // order items
   orderProduct: {
     select: {
       id: true,
@@ -303,16 +352,20 @@ export const selectOrderByUuid: Prisma.OrderSelect = {
       name: true,
       quantity: true,
       price: true,
+
+      // denormalized bundle/variant snapshots (if you store them)
       bundleGroupId: true,
       sourcePackageType: true,
       bundleName: true,
       minusPrice: true,
       bundleImage: true,
+
       variantId: true,
       variantUuid: true,
       variantName: true,
       variantCode: true,
       variantImage: true,
+
       orderProductImage: {
         select: {
           uuid: true,
@@ -321,19 +374,6 @@ export const selectOrderByUuid: Prisma.OrderSelect = {
       },
     },
   },
-  subTotalPay: true,
-  voucherDiscount: true,
-  deliveryFee: true,
-  totalPayment: true,
-  xenditFee: true,
-  xenditFeeVat: true,
-  isNetAmountCalculated: true,
-  netAmount: true,
-  status: true,
-  expiredAt: true,
-  phoneNumber: true,
-  email: true,
-  updatedAt: true,
 };
 
 export const selectGeneralTrackOrderUuid: Prisma.OrderSelect = {

@@ -421,6 +421,16 @@ model Order {
   driverName     String?
   technicianId   Int?
   technicianName String?
+  task           String?
+  remarks        String? @db.Text
+
+  freonBefore   Float?
+  freonAfter    Float?
+  tempBefore    Float?
+  tempAfter     Float?
+  currentBefore Float?
+  currentAfter  Float?
+  images        OrderImage[]
 
   orderAddressId     Int?
   recipientAddressId Int?
@@ -434,6 +444,21 @@ model Order {
 
   @@index([orderAddressId])
   @@index([recipientAddressId])
+}
+
+model OrderImage {
+  id     Int     @id @default(autoincrement())
+  uuid   String  @unique @default(uuid())
+  url    String
+  isMain Boolean @default(false)
+
+  serviceCompleteId Int
+  serviceComplete   Order @relation(fields: [serviceCompleteId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([serviceCompleteId])
 }
 
 model OrderAddress {

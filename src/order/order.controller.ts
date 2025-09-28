@@ -9,24 +9,28 @@ import {
   Post,
   Query,
   Res,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { OrderService } from './services/order.service';
 import {
   CreateOrderDto,
   OrderNetDto,
   QueryOrderDto,
+  SetCompleteOrderDto,
   UpdateOrderStatusDto,
 } from './dto/order.dto';
 import { Response } from 'express';
 import { formatResponse } from 'helpers/http.helper';
-import { errorHandler } from 'helpers/validation.helper';
+import { errorHandler, imageFileFilter } from 'helpers/validation.helper';
 import { JwtGuard, RoleGuard } from 'src/auth/guard';
 import { TypeRoleAdmin, TypeRoleUser } from '@prisma/client';
 import { Roles } from 'src/auth/decorator';
 import { OrderPaymentMethodService } from './services/order-payment-method.service';
 import { IOrderPayment } from './interfaces/order.interface';
 import { AuthService } from 'src/auth/auth.service';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 
 @Controller()
 export class OrderController {
@@ -71,6 +75,37 @@ export class OrderController {
       return formatResponse(res, HttpStatus.OK, null);
     } catch (error) {
       errorHandler(res, error);
+    }
+  }
+
+  @UseGuards(JwtGuard)
+  @Patch('order/complete')
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'mainPhoto', maxCount: 1 },
+        { name: 'photos', maxCount: 10 },
+      ],
+      { fileFilter: imageFileFilter },
+    ),
+  )
+  async setCompleteOrder(
+    @Body() dto: SetCompleteOrderDto,
+    @UploadedFiles()
+    files: {
+      mainPhoto?: Express.Multer.File[];
+      photos?: Express.Multer.File[];
+    },
+    @Res() res: Response,
+  ) {
+    try {
+      await this.orderService.setCompleteOrder(dto, {
+        mainPhoto: files?.mainPhoto?.[0],
+        photos: files?.photos ?? [],
+      });
+      return formatResponse(res, HttpStatus.OK, null);
+    } catch (err) {
+      return errorHandler(res, err);
     }
   }
 

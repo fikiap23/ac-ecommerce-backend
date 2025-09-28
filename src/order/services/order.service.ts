@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   CreateOrderDto,
   OrderNetDto,
-  UpdateOrderDto,
+  SetCompleteOrderDto,
   UpdateOrderStatusDto,
 } from '../dto/order.dto';
 import { ProductRepository } from 'src/product/repositories/product.repository';
@@ -16,20 +16,11 @@ import {
   ISelectGeneralOrder,
 } from '../interfaces/order.interface';
 import { GatewayService } from 'src/gateway/services/gateway.service';
-import {
-  Customer,
-  Driver,
-  OrderProduct,
-  Prisma,
-  TypeProductPackage,
-  TypeProductService,
-  TypeStatusOrder,
-} from '@prisma/client';
+import { Prisma, TypeStatusOrder } from '@prisma/client';
 import { GatewayXenditRepository } from 'src/gateway/repositories/gateway-xendit.repository';
 import { MailService } from 'src/mail/services/mail.service';
 import { CustomError } from 'helpers/http.helper';
 import { OrderValidateRepository } from '../repositories/order-validate.repository';
-import { omit } from 'lodash';
 import {
   formatToISOE164,
   genRandomNumber,
@@ -39,7 +30,6 @@ import { OrderCallbackPaymentRepository } from '../repositories/order-callback-p
 import {
   selectGeneralListOrders,
   selectGeneralOrder,
-  selectGeneralTrackOrder,
   selectGeneralTrackOrderUuid,
   selectOrderByUuid,
   selectOrderCreate,
@@ -1232,6 +1222,98 @@ export class OrderService {
           });
         }
 
+        for (const p of productOrders) {
+          await this.orderProductRepository.updateByUuid({
+            uuid: p.orderProductUuid,
+            data: { deviceId: p.deviceId },
+            tx,
+          });
+        }
+      }
+
+      return null;
+    });
+  }
+
+  async setCompleteOrder(
+    dto: SetCompleteOrderDto,
+    opts?: { mainPhoto?: Express.Multer.File; photos?: Express.Multer.File[] },
+  ) {
+    const { mainPhoto, photos = [] } = opts ?? {};
+    const { orderUuid, scheduleAt, productOrders, replaceImages, ...payload } =
+      dto;
+
+    const scheduleAtDate = scheduleAt ? new Date(scheduleAt) : undefined;
+    if (scheduleAt && isNaN(scheduleAtDate.getTime())) {
+      throw new CustomError({
+        message: 'scheduleAt harus ISO',
+        statusCode: 400,
+      });
+    }
+
+    const imagesToCreate: { url: string; isMain: boolean }[] = [];
+    if (mainPhoto) {
+      const url = await this.orderRepository.saveLocalImage(mainPhoto);
+      imagesToCreate.push({ url, isMain: true });
+    }
+    for (const f of photos) {
+      const url = await await this.orderRepository.saveLocalImage(f);
+      imagesToCreate.push({ url, isMain: false });
+    }
+
+    return this.prismaService.execTx(async (tx) => {
+      const order = await this.orderRepository.getThrowByUuid({
+        uuid: orderUuid,
+        select: { id: true },
+        tx,
+      });
+
+      const data: Prisma.OrderUpdateInput = {
+        status: payload.status,
+        scheduledAt: scheduleAtDate ?? undefined,
+        task: payload.task ?? undefined,
+        notes: payload.notes ?? undefined,
+        remarks: payload.remarks ?? undefined,
+        freonBefore: payload.freonBefore,
+        freonAfter: payload.freonAfter,
+        tempBefore: payload.tempBefore,
+        tempAfter: payload.tempAfter,
+        currentBefore: payload.currentBefore,
+        currentAfter: payload.currentAfter,
+        images:
+          imagesToCreate.length || replaceImages
+            ? {
+                ...(replaceImages ? { deleteMany: {} } : {}),
+                ...(imagesToCreate.length ? { create: imagesToCreate } : {}),
+              }
+            : undefined,
+      };
+
+      await this.orderRepository.update({
+        where: { uuid: orderUuid },
+        data,
+        tx,
+      });
+
+      if (productOrders?.length) {
+        const ids = productOrders.map((p) => p.orderProductUuid);
+        const found = await this.orderProductRepository.getMany({
+          where: { orderId: order.id, uuid: { in: ids } },
+          select: { uuid: true },
+          tx,
+        });
+        const valid = new Set(found.map((x) => x.uuid));
+        const invalid = productOrders.filter(
+          (p) => !valid.has(p.orderProductUuid),
+        );
+        if (invalid.length) {
+          throw new CustomError({
+            message: `orderProductUuid tidak valid: ${invalid
+              .map((i) => i.orderProductUuid)
+              .join(', ')}`,
+            statusCode: 400,
+          });
+        }
         for (const p of productOrders) {
           await this.orderProductRepository.updateByUuid({
             uuid: p.orderProductUuid,

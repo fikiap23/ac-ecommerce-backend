@@ -12,6 +12,9 @@ import { CartItemProductDto, CreateOrderDto } from '../dto/order.dto';
 import { ISelectVoucherForCalculate } from 'src/voucher/interfaces/voucher.interface';
 import { ISelectProductForCreateOrder } from 'src/product/interfaces/product.interface';
 import { whereOrderGetManyPaginate } from 'src/prisma/queries/order/props/where-order.prop';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { genIdPrefixTimestamp, genSlug } from 'helpers/data.helper';
 
 @Injectable()
 export class OrderRepository {
@@ -547,4 +550,24 @@ export class OrderRepository {
       ];
     });
   }
+
+  saveLocalImage = async (file: Express.Multer.File) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const base = genSlug((file.originalname || '').replace(ext, ''));
+    const fileName = `${genIdPrefixTimestamp(base)}${ext || ''}`;
+    const dir = path.join(
+      process.cwd(),
+      'public',
+      'upload',
+      'order',
+      'complete',
+    );
+    await fs.mkdir(dir, { recursive: true });
+    const absPath = path.join(dir, fileName);
+    const content =
+      file.buffer ?? (file.path ? await fs.readFile(file.path) : null);
+    if (!content) throw new Error('File kosong');
+    await fs.writeFile(absPath, content);
+    return `/upload/order/complete/${fileName}`;
+  };
 }

@@ -8,7 +8,7 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { PartialType } from '@nestjs/mapped-types';
 import { SearchPaginationDto } from 'utils/dto/pagination.dto';
 import { TypeStatusOrder } from '@prisma/client';
@@ -183,6 +183,71 @@ export class UpdateOrderStatusDto {
   @IsOptional()
   @IsString()
   scheduleAt?: string;
+
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateProductOrderDeviceDto)
+  productOrders?: UpdateProductOrderDeviceDto[];
+}
+
+export class SetCompleteOrderDto {
+  @IsString()
+  @IsNotEmpty()
+  orderUuid: string;
+
+  @IsOptional()
+  @IsEnum(TypeStatusOrder)
+  status?: TypeStatusOrder;
+
+  @IsOptional()
+  scheduleAt?: string;
+
+  @IsOptional()
+  @IsString()
+  task?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  freonBefore?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  freonAfter?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  tempBefore?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  tempAfter?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  currentBefore?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  currentAfter?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => value === 'true')
+  @IsBoolean()
+  replaceImages?: boolean;
 
   @IsOptional()
   @ValidateNested({ each: true })
