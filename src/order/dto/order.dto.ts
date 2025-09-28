@@ -254,3 +254,9 @@ export class SetCompleteOrderDto {
   @Type(() => UpdateProductOrderDeviceDto)
   productOrders?: UpdateProductOrderDeviceDto[];
 }
+
+export class DeviceListFilterDto extends SearchPaginationDto {
+  @IsOptional()
+  @IsString()
+  orderUuid?: string;
+}

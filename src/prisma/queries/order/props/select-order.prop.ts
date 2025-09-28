@@ -422,3 +422,11 @@ export const selectGeneralTrackOrderUuid: Prisma.OrderSelect = {
   totalPayment: true,
   expiredAt: true,
 };
+
+export const selectOrderProductDevice: Prisma.OrderProductSelect = {
+  uuid: true,
+  name: true,
+  variantName: true,
+  deviceId: true,
+  createdAt: true,
+};

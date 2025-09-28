@@ -42,3 +42,13 @@ export type IOrderPayment = IVaWebhookResponse &
   IQrCodeWebhookResponse &
   IPaylaterWebhookResponse &
   IRetailOutletWebhookResponse;
+
+export type IDeviceListFilter = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  orderUuid?: string;
+  orderId?: number;
+  customerId: number;
+  sort?: Prisma.SortOrder;
+};

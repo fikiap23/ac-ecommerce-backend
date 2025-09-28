@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   CreateOrderDto,
+  DeviceListFilterDto,
   OrderNetDto,
   SetCompleteOrderDto,
   UpdateOrderStatusDto,
@@ -10,6 +11,7 @@ import { VoucherRepository } from 'src/voucher/repositories/voucher.repository';
 import { OrderRepository } from '../repositories/order.repository';
 import { CustomerRepository } from 'src/customer/repositories/customer.repository';
 import {
+  IDeviceListFilter,
   IFilterOrder,
   IOrderPayment,
   ISelectGeneralListOrder,
@@ -1205,7 +1207,7 @@ export class OrderService {
         const ids = productOrders.map((p) => p.orderProductUuid);
         const found = await this.orderProductRepository.getMany({
           where: { orderId: order.id, uuid: { in: ids } },
-          select: { uuid: true },
+          select: { uuid: true, deviceId: true },
           tx,
         });
 
@@ -1223,6 +1225,13 @@ export class OrderService {
         }
 
         for (const p of productOrders) {
+          // device id must be unique
+          // if (found.some((f) => f.deviceId === p.deviceId)) {
+          //   throw new CustomError({
+          //     message: `deviceId ${p.deviceId} sudah digunakan`,
+          //     statusCode: 400,
+          //   });
+          // }
           await this.orderProductRepository.updateByUuid({
             uuid: p.orderProductUuid,
             data: { deviceId: p.deviceId },
@@ -1299,7 +1308,7 @@ export class OrderService {
         const ids = productOrders.map((p) => p.orderProductUuid);
         const found = await this.orderProductRepository.getMany({
           where: { orderId: order.id, uuid: { in: ids } },
-          select: { uuid: true },
+          select: { uuid: true, deviceId: true },
           tx,
         });
         const valid = new Set(found.map((x) => x.uuid));
@@ -1315,6 +1324,13 @@ export class OrderService {
           });
         }
         for (const p of productOrders) {
+          // device id must be unique
+          // if (found.some((f) => f.deviceId === p.deviceId)) {
+          //   throw new CustomError({
+          //     message: `deviceId ${p.deviceId} sudah digunakan`,
+          //     statusCode: 400,
+          //   });
+          // }
           await this.orderProductRepository.updateByUuid({
             uuid: p.orderProductUuid,
             data: { deviceId: p.deviceId },
@@ -1324,6 +1340,18 @@ export class OrderService {
       }
 
       return null;
+    });
+  }
+
+  async getManyDevicePaginate(sub: string, dto: DeviceListFilterDto) {
+    const customer = await this.customerRepository.getThrowByUuid({
+      uuid: sub,
+    });
+    return this.orderProductRepository.getManyDevicePaginate({
+      filter: {
+        ...dto,
+        customerId: customer.id,
+      },
     });
   }
 }

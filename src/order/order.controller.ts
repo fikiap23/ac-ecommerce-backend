@@ -16,6 +16,7 @@ import {
 import { OrderService } from './services/order.service';
 import {
   CreateOrderDto,
+  DeviceListFilterDto,
   OrderNetDto,
   QueryOrderDto,
   SetCompleteOrderDto,
@@ -31,6 +32,7 @@ import { OrderPaymentMethodService } from './services/order-payment-method.servi
 import { IOrderPayment } from './interfaces/order.interface';
 import { AuthService } from 'src/auth/auth.service';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { SearchPaginationDto } from 'utils/dto/pagination.dto';
 
 @Controller()
 export class OrderController {
@@ -190,6 +192,23 @@ export class OrderController {
       return formatResponse(res, HttpStatus.OK, result);
     } catch (error) {
       errorHandler(res, error);
+    }
+  }
+
+  @UseGuards(JwtGuard)
+  @Get('device/paginate')
+  async getDevicePaginate(
+    @Query() query: DeviceListFilterDto,
+    @Headers('authorization') authorization: string,
+    @Res() res: Response,
+  ) {
+    try {
+      const { sub } = await this.authService.decodeJwtToken(authorization);
+      const result = await this.orderService.getManyDevicePaginate(sub, query);
+
+      return formatResponse(res, HttpStatus.OK, result.data, result.meta);
+    } catch (error) {
+      return errorHandler(res, error);
     }
   }
 }

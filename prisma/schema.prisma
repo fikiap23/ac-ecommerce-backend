@@ -81,6 +81,11 @@ enum TypeBanner {
   BLOG
 }
 
+enum TypeStatusTestimonial {
+  PUBLISH
+  HIDE
+}
+
 model Customer {
   id          Int          @id @default(autoincrement())
   uuid        String       @unique @default(uuid())
@@ -190,15 +195,20 @@ model BannerCampaign {
 }
 
 model Testimonial {
-  id                 Int      @id @default(autoincrement())
-  uuid               String   @unique @default(uuid())
+  id                 Int                   @id @default(autoincrement())
+  uuid               String                @unique @default(uuid())
   name               String
   cityOrDistrict     String
   productDescription String?
-  description        String   @db.Text
-  videoOrImage       String
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  description        String                @db.Text
+  videoOrImage       String?
+  rating             Float?
+  productId          Int?
+  product            Product?              @relation(fields: [productId], references: [id])
+  createdBy          String?
+  status             TypeStatusTestimonial @default(PUBLISH)
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 }
 
 model CategoryProduct {
@@ -245,6 +255,7 @@ model Product {
   productImage          ProductImage[]
   productVoucer         ProductVoucer[]
   customerProductBundle CustomerProductBundle[]
+  testimonial           Testimonial[]
 }
 
 model Type {
@@ -484,7 +495,7 @@ model OrderProduct {
   uuid         String              @unique @default(uuid())
   packageType  TypeProductPackage?
   serviceType  TypeProductService?
-  deviceId     String?
+  deviceId     String?             @unique
   name         String
   brand        String?
   description  String              @db.Text
