@@ -21,7 +21,7 @@ import { Response } from 'express';
 import { errorHandler, imageFileFilter } from 'helpers/validation.helper';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UpdateCustomerDto } from './dto/customer.dto';
-import { TypeRoleUser } from '@prisma/client';
+import { TypeRoleAdmin, TypeRoleUser } from '@prisma/client';
 import { AuthService } from 'src/auth/auth.service';
 import { SearchPaginationDto } from 'utils/dto/pagination.dto';
 import { CustomerAddressService } from './services/customer-address.service';
@@ -259,6 +259,18 @@ export class CustomerController {
     const { sub } = await this.authService.decodeJwtToken(authorization);
     try {
       const result = await this.customerOrderService.getAll(sub, queries);
+      return formatResponse(res, HttpStatus.OK, result.data, result.meta);
+    } catch (error) {
+      errorHandler(res, error);
+    }
+  }
+
+  @UseGuards(JwtGuard, RoleGuard)
+  @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN)
+  @Get('paginate')
+  async getMany(@Query() queries: SearchPaginationDto, @Res() res: Response) {
+    try {
+      const result = await this.customerProfileService.getManyPaginate(queries);
       return formatResponse(res, HttpStatus.OK, result.data, result.meta);
     } catch (error) {
       errorHandler(res, error);

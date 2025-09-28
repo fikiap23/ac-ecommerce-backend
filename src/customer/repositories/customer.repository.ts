@@ -201,7 +201,7 @@ export class CustomerRepository {
       tx,
       where: combinedWhere,
       select,
-      orderBy: { [orderBy]: sort },
+      orderBy: { createdAt: sort },
       page,
       limit,
     });
