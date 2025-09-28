@@ -35,6 +35,8 @@ export type IFilterOrder = {
   limit: number;
   search?: string;
   status?: TypeStatusOrder;
+  startDate?: string;
+  endDate?: string;
 };
 
 export type IOrderPayment = IVaWebhookResponse &
@@ -52,3 +54,18 @@ export type IDeviceListFilter = {
   customerId: number;
   sort?: Prisma.SortOrder;
 };
+
+export type IFilterReportSummary = {
+  startDate?: string;
+  endDate?: string;
+};
+
+export type IFilterReportTransactionStats = {
+  period?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  by?: 'revenue' | 'qty';
+};
+
+export type IFilterReportRecentTransaction = {
+  startDate?: String;
+  endDate?: String;
+} & IFilterOrder;

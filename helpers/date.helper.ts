@@ -16,3 +16,32 @@ export function orderFormatDate(date: Date): string {
     date.getSeconds(),
   )}`;
 }
+
+export function getMonth() {
+  return [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+}
+
+export function getDay() {
+  return [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+}

@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { IFilterOrder } from 'src/order/interfaces/order.interface';
 
 export const whereOrderGetManyPaginate = (props: IFilterOrder) => {
-  const { search, status } = props;
+  const { search, status, startDate, endDate } = props;
 
   const where: Prisma.OrderWhereInput = {};
 
@@ -20,19 +20,18 @@ export const whereOrderGetManyPaginate = (props: IFilterOrder) => {
           mode: 'insensitive',
         },
       },
-      {
-        orderAddress: {
-          address: {
-            contains: search,
-            mode: 'insensitive',
-          },
-        },
-      },
     ];
   }
 
   if (status) {
     where.status = status;
+  }
+
+  if (startDate && endDate) {
+    where.createdAt = {
+      gte: new Date(startDate),
+      lte: new Date(endDate),
+    };
   }
 
   return { where };

@@ -19,6 +19,8 @@ import {
   DeviceListFilterDto,
   OrderNetDto,
   QueryOrderDto,
+  QueryReportSummaryDto,
+  QueryReportTransactionStatsDto,
   SetCompleteOrderDto,
   UpdateOrderStatusDto,
 } from './dto/order.dto';
@@ -189,6 +191,36 @@ export class OrderController {
     try {
       console.log('Webhook from Xendit:', dto);
       const result = await this.orderService.orderPayment(token, dto);
+      return formatResponse(res, HttpStatus.OK, result);
+    } catch (error) {
+      errorHandler(res, error);
+    }
+  }
+
+  @UseGuards(JwtGuard, RoleGuard)
+  @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN)
+  @Get('order-summary')
+  async getSummary(
+    @Query() queries: QueryReportSummaryDto,
+    @Res() res: Response,
+  ) {
+    try {
+      const result = await this.orderService.getSummary(queries);
+      return formatResponse(res, HttpStatus.OK, result);
+    } catch (error) {
+      errorHandler(res, error);
+    }
+  }
+
+  @UseGuards(JwtGuard, RoleGuard)
+  @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN)
+  @Get('order-transaction-stats')
+  async getTransactionStats(
+    @Query() queries: QueryReportTransactionStatsDto,
+    @Res() res: Response,
+  ) {
+    try {
+      const result = await this.orderService.getTransactionStats(queries);
       return formatResponse(res, HttpStatus.OK, result);
     } catch (error) {
       errorHandler(res, error);

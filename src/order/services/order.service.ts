@@ -13,6 +13,8 @@ import { CustomerRepository } from 'src/customer/repositories/customer.repositor
 import {
   IDeviceListFilter,
   IFilterOrder,
+  IFilterReportSummary,
+  IFilterReportTransactionStats,
   IOrderPayment,
   ISelectGeneralListOrder,
   ISelectGeneralOrder,
@@ -54,6 +56,8 @@ import { BundleRepository } from 'src/product/repositories/bundle.repository';
 import { CustomerProductRepository } from 'src/customer/repositories/customer-product.repository';
 import { TechnicianRepository } from 'src/technician/repositories/technician.repository';
 import { DriverRepository } from 'src/driver/repositories/driver.repository';
+import * as luxon from 'luxon';
+import { getDay, getMonth } from 'helpers/date.helper';
 
 @Injectable()
 export class OrderService {
@@ -1353,5 +1357,263 @@ export class OrderService {
         customerId: customer.id,
       },
     });
+  }
+
+  async getSummary(filter: IFilterReportSummary) {
+    const balance = await this.orderRepository.aggregate({
+      _sum: {
+        totalPayment: true,
+      },
+      where: {
+        status: TypeStatusOrder.SHIPPED,
+        ...(filter.startDate &&
+          filter.endDate && {
+            createdAt: {
+              gte: new Date(filter.startDate),
+              lte: new Date(filter.endDate),
+            },
+          }),
+      },
+    });
+
+    const numberOfTransaction = await this.orderRepository.count({
+      where: {
+        ...(filter.startDate &&
+          filter.endDate && {
+            createdAt: {
+              gte: new Date(filter.startDate),
+              lte: new Date(filter.endDate),
+            },
+          }),
+      },
+    });
+
+    return {
+      balance: balance._sum.totalPayment || 0,
+      numberOfTransaction,
+    };
+  }
+
+  async getTransactionStats(filter: IFilterReportTransactionStats) {
+    const filterBy = filter.by || 'qty';
+    const period = filter.period || 'yearly';
+
+    let startDate: Date | null = null;
+    let endDate: Date | null = null;
+
+    const year = luxon.DateTime.now().setZone('Asia/Jakarta').year;
+    const month = luxon.DateTime.now().setZone('Asia/Jakarta').month;
+    const day = luxon.DateTime.now().setZone('Asia/Jakarta').day;
+
+    let startJakarta;
+    let endJakarta;
+
+    if (period === 'yearly') {
+      startJakarta = luxon.DateTime.fromObject(
+        {
+          year: year,
+          month: 1,
+          day: 1,
+          hour: 0,
+          minute: 0,
+          second: 0,
+          millisecond: 0,
+        },
+        { zone: 'Asia/Jakarta' },
+      );
+      endJakarta = luxon.DateTime.fromObject(
+        {
+          year: year,
+          month: 12,
+          day: 31,
+          hour: 23,
+          minute: 59,
+          second: 59,
+          millisecond: 999,
+        },
+        { zone: 'Asia/Jakarta' },
+      );
+    } else if (period === 'monthly') {
+      startJakarta = luxon.DateTime.fromObject(
+        {
+          year: year,
+          month: month,
+          day: 1,
+          hour: 0,
+          minute: 0,
+          second: 0,
+          millisecond: 0,
+        },
+        { zone: 'Asia/Jakarta' },
+      );
+      endJakarta = startJakarta
+        .plus({ months: 1 })
+        .set({ hour: 23, minute: 59, second: 59, millisecond: 999 });
+    } else if (period === 'weekly') {
+      const currentJakarta = luxon.DateTime.fromObject(
+        {
+          year: year,
+          month: month,
+          day: day,
+          hour: 0,
+          minute: 0,
+          second: 0,
+          millisecond: 0,
+        },
+        { zone: 'Asia/Jakarta' },
+      );
+      const currentWeekday = currentJakarta.weekday;
+      const daysFromMonday = currentWeekday - 1;
+
+      startJakarta = currentJakarta.minus({ days: daysFromMonday });
+      endJakarta = startJakarta
+        .plus({ days: 6 })
+        .set({ hour: 23, minute: 59, second: 59, millisecond: 999 });
+    } else if (period === 'daily') {
+      startJakarta = luxon.DateTime.fromObject({
+        year: year,
+        month: month,
+        day: day,
+        hour: 0,
+        minute: 0,
+        second: 0,
+        millisecond: 0,
+      });
+      endJakarta = startJakarta
+        .plus({ days: 1 })
+        .set({ hour: 23, minute: 59, second: 59, millisecond: 999 });
+    }
+
+    startDate = startJakarta.toJSDate();
+    endDate = endJakarta.toJSDate();
+
+    const groupedData = await this.orderRepository.groupBy({
+      by: ['createdAt'],
+      ...(filterBy === 'qty'
+        ? {
+            _count: {
+              id: true,
+            },
+          }
+        : {
+            _sum: {
+              totalPayment: true,
+            },
+          }),
+      where: {
+        status: TypeStatusOrder.SHIPPED,
+        createdAt: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+    });
+
+    if (period === 'yearly') {
+      const monthlyData = {};
+
+      const months = getMonth();
+
+      months.forEach((month, index) => {
+        monthlyData[month] = 0;
+      });
+
+      groupedData.forEach((item) => {
+        const date = new Date(item.createdAt);
+        const monthIndex = date.getMonth();
+        const monthName = months[monthIndex];
+
+        if (item._sum?.totalPayment) {
+          monthlyData[monthName] += item._sum.totalPayment;
+        } else if (item._count?.id) {
+          monthlyData[monthName] += item._count.id;
+        }
+      });
+
+      return monthlyData;
+    }
+
+    if (period === 'monthly') {
+      const dailyData = {};
+
+      const daysInMonth = luxon.DateTime.fromObject(
+        {
+          year: year,
+          month: month,
+        },
+        { zone: 'Asia/Jakarta' },
+      ).daysInMonth;
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        dailyData[day] = 0;
+      }
+
+      groupedData.forEach((item) => {
+        const jakartaDate = luxon.DateTime.fromJSDate(
+          new Date(item.createdAt),
+        ).setZone('Asia/Jakarta');
+        const dayOfMonth = jakartaDate.day;
+
+        if (dailyData.hasOwnProperty(dayOfMonth)) {
+          if (item._sum?.totalPayment) {
+            dailyData[dayOfMonth] += item._sum.totalPayment;
+          } else if (item._count?.id) {
+            dailyData[dayOfMonth] += item._count.id;
+          }
+        }
+      });
+
+      return dailyData;
+    }
+
+    if (period === 'weekly') {
+      const weeklyData = {};
+      const dayNames = getDay();
+
+      dayNames.forEach((dayName) => {
+        weeklyData[dayName] = 0;
+      });
+
+      groupedData.forEach((item) => {
+        const jakartaDate = luxon.DateTime.fromJSDate(
+          new Date(item.createdAt),
+        ).setZone('Asia/Jakarta');
+        const dayOfWeek = jakartaDate.weekday;
+        const dayName = dayNames[dayOfWeek - 1];
+
+        if (item._sum?.totalPayment) {
+          weeklyData[dayName] += item._sum.totalPayment;
+        } else if (item._count?.id) {
+          weeklyData[dayName] += item._count.id;
+        }
+      });
+
+      return weeklyData;
+    }
+
+    if (period === 'daily') {
+      const hourlyData = {};
+
+      for (let hour = 0; hour <= 23; hour++) {
+        const hourKey = hour.toString().padStart(2, '0');
+        hourlyData[hourKey] = 0;
+      }
+
+      groupedData.forEach((item) => {
+        const jakartaDate = luxon.DateTime.fromJSDate(
+          new Date(item.createdAt),
+        ).setZone('Asia/Jakarta');
+        const hour = jakartaDate.hour;
+        const hourKey = hour.toString().padStart(2, '0');
+
+        if (item._sum?.totalPayment) {
+          hourlyData[hourKey] += item._sum.totalPayment;
+        } else if (item._count?.id) {
+          hourlyData[hourKey] += item._count.id;
+        }
+      });
+
+      return hourlyData;
+    }
   }
 }

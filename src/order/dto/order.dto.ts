@@ -139,6 +139,14 @@ export class QueryOrderDto extends SearchPaginationDto {
   @IsOptional()
   @IsEnum(TypeStatusOrder)
   status?: TypeStatusOrder;
+
+  @IsOptional()
+  @IsString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsString()
+  endDate?: string;
 }
 
 export class OrderNetDto {
@@ -259,4 +267,34 @@ export class DeviceListFilterDto extends SearchPaginationDto {
   @IsOptional()
   @IsString()
   orderUuid?: string;
+}
+
+export class QueryReportSummaryDto {
+  @IsOptional()
+  @IsString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsString()
+  endDate?: string;
+}
+
+export class QueryReportTransactionStatsDto {
+  @IsOptional()
+  @IsString()
+  period: 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+  @IsOptional()
+  @IsString()
+  by: 'revenue' | 'qty';
+}
+
+export class QueryReportRecentTransactionDto extends SearchPaginationDto {
+  @IsOptional()
+  @IsString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsString()
+  endDate?: string;
 }
