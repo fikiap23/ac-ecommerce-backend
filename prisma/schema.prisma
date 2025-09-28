@@ -496,7 +496,7 @@ model OrderProduct {
   uuid         String              @unique @default(uuid())
   packageType  TypeProductPackage?
   serviceType  TypeProductService?
-  deviceId     String?             @unique
+  deviceId     String?
   name         String
   brand        String?
   description  String              @db.Text
@@ -529,6 +529,8 @@ model OrderProduct {
   bundleGroupId     String?
   minusPrice        Int?
   bundleImage       String?
+
+  @@index([deviceId])
 }
 
 model OrderProductImage {
@@ -643,11 +645,46 @@ model Driver {
   updatedAt DateTime @updatedAt
 }
 
-model Footer {
-  id        Int      @id @default(autoincrement())
-  uuid      String   @unique @default(uuid())
-  title     String
-  link      String?
+model SiteSetting {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(uuid())
+
+  // Company
+  logo        String?
+  description String? @db.Text
+
+  // Contact
+  phone   String?
+  email   String?
+  address String?
+
+  // Footer
+  copyrightText String? @db.Text
+
+  // Relations
+  socialMedias SettingSocial[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+}
+
+model SettingSocial {
+  id   Int    @id @default(autoincrement())
+  uuid String @unique @default(uuid())
+
+  settingId Int
+  setting   SiteSetting @relation(fields: [settingId], references: [id], onDelete: Cascade)
+
+  username String
+  icon     String?
+  url      String?
+
+  order    Int     @default(0)
+  isActive Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([settingId])
 }

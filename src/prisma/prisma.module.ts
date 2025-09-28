@@ -23,6 +23,8 @@ import { CapacityQuery } from './queries/capacity/capacity.query';
 import { TechnicianQuery } from './queries/technician/technician.query';
 import { DriverQuery } from './queries/driver/driver.query';
 import { BundleQuery } from './queries/bundle/bundle.query';
+import { SiteSettingQuery } from './queries/setting/site-setting.query';
+import { SettingSocialQuery } from './queries/setting/setting-social.query';
 
 @Module({
   imports: [],
@@ -51,6 +53,8 @@ import { BundleQuery } from './queries/bundle/bundle.query';
     TechnicianQuery,
     DriverQuery,
     BundleQuery,
+    SiteSettingQuery,
+    SettingSocialQuery,
   ],
   exports: [
     PrismaService,
@@ -77,6 +81,8 @@ import { BundleQuery } from './queries/bundle/bundle.query';
     TechnicianQuery,
     DriverQuery,
     BundleQuery,
+    SiteSettingQuery,
+    SettingSocialQuery,
   ],
 })
 export class PrismaModule {}

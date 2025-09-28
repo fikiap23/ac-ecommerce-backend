@@ -15,6 +15,7 @@ import { OrderModule } from './order/order.module';
 import { MailModule } from './mail/mail.module';
 import { DriverModule } from './driver/driver.module';
 import { TechnicianModule } from './technician/technician.module';
+import { SettingModule } from './setting/setting.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { TechnicianModule } from './technician/technician.module';
     MailModule,
     DriverModule,
     TechnicianModule,
+    SettingModule,
   ],
 })
 export class AppModule implements NestModule {
