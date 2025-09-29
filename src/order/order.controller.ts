@@ -33,7 +33,10 @@ import { Roles } from 'src/auth/decorator';
 import { OrderPaymentMethodService } from './services/order-payment-method.service';
 import { IOrderPayment } from './interfaces/order.interface';
 import { AuthService } from 'src/auth/auth.service';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import {
+  AnyFilesInterceptor,
+  FileFieldsInterceptor,
+} from '@nestjs/platform-express';
 
 @Controller()
 export class OrderController {
@@ -81,34 +84,39 @@ export class OrderController {
     }
   }
 
-  @UseGuards(JwtGuard)
+  @UseGuards(JwtGuard, RoleGuard)
   @Patch('order/complete')
   @UseInterceptors(
-    FileFieldsInterceptor(
-      [
-        { name: 'mainPhoto', maxCount: 1 },
-        { name: 'photos', maxCount: 10 },
-      ],
-      { fileFilter: imageFileFilter },
-    ),
+    AnyFilesInterceptor({
+      fileFilter: imageFileFilter,
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
   )
-  async setCompleteOrder(
+  async setComplete(
     @Body() dto: SetCompleteOrderDto,
-    @UploadedFiles()
-    files: {
-      mainPhoto?: Express.Multer.File[];
-      photos?: Express.Multer.File[];
-    },
+    @UploadedFiles() files: Express.Multer.File[],
     @Res() res: Response,
   ) {
     try {
-      await this.orderService.setCompleteOrder(dto, {
-        mainPhoto: files?.mainPhoto?.[0],
-        photos: files?.photos ?? [],
-      });
+      // items[0][images] , items[0][images] (boleh berulang), items[1][images], dst.
+      const imgRe = /^items\[(\d+)]\[images]$/;
+
+      const bucket: Record<number, Express.Multer.File[]> = {};
+      for (const f of files || []) {
+        const m = f.fieldname.match(imgRe);
+        if (m) {
+          const i = Number(m[1]);
+          (bucket[i] ||= []).push(f);
+        }
+      }
+
+      // urutkan sesuai index items[] di DTO; item tanpa file -> []
+      const filesByItem = (dto.items ?? []).map((_, i) => bucket[i] ?? []);
+
+      await this.orderService.setCompleteOrder(dto, filesByItem);
       return formatResponse(res, HttpStatus.OK, null);
-    } catch (err) {
-      return errorHandler(res, err);
+    } catch (e) {
+      return errorHandler(res, e);
     }
   }
 

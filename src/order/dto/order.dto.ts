@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsBoolean,
   IsEmail,
   IsEnum,
@@ -198,71 +199,6 @@ export class UpdateOrderStatusDto {
   productOrders?: UpdateProductOrderDeviceDto[];
 }
 
-export class SetCompleteOrderDto {
-  @IsString()
-  @IsNotEmpty()
-  orderUuid: string;
-
-  @IsOptional()
-  @IsEnum(TypeStatusOrder)
-  status?: TypeStatusOrder;
-
-  @IsOptional()
-  scheduleAt?: string;
-
-  @IsOptional()
-  @IsString()
-  task?: string;
-
-  @IsOptional()
-  @IsString()
-  notes?: string;
-
-  @IsOptional()
-  @IsString()
-  remarks?: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  freonBefore?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  freonAfter?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  tempBefore?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  tempAfter?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  currentBefore?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  currentAfter?: number;
-
-  @IsOptional()
-  @Transform(({ value }) => value === 'true')
-  @IsBoolean()
-  replaceImages?: boolean;
-
-  @IsOptional()
-  @ValidateNested({ each: true })
-  @Type(() => UpdateProductOrderDeviceDto)
-  productOrders?: UpdateProductOrderDeviceDto[];
-}
-
 export class DeviceListFilterDto extends SearchPaginationDto {
   @IsOptional()
   @IsString()
@@ -297,4 +233,53 @@ export class QueryReportRecentTransactionDto extends SearchPaginationDto {
   @IsOptional()
   @IsString()
   endDate?: string;
+}
+
+export class SetCompleteOrderItemDto {
+  @IsString()
+  @IsNotEmpty()
+  orderProductUuid: string;
+
+  @IsOptional()
+  @IsString()
+  deviceId?: string;
+
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+
+  @IsOptional() @IsNumber() freonBefore?: number;
+  @IsOptional() @IsNumber() freonAfter?: number;
+  @IsOptional() @IsNumber() tempBefore?: number;
+  @IsOptional() @IsNumber() tempAfter?: number;
+  @IsOptional() @IsNumber() currentBefore?: number;
+  @IsOptional() @IsNumber() currentAfter?: number;
+
+  // kalau true → hapus semua gambar lama OrderProduct ini dulu
+  @IsOptional()
+  @IsBoolean()
+  replaceImages?: boolean;
+}
+
+export class SetCompleteOrderDto {
+  @IsString()
+  @IsNotEmpty()
+  orderUuid: string;
+
+  @IsOptional()
+  status?: TypeStatusOrder;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsString()
+  scheduleAt?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SetCompleteOrderItemDto)
+  items?: SetCompleteOrderItemDto[];
 }

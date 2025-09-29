@@ -436,15 +436,6 @@ model Order {
   technicianId   Int?
   technicianName String?
   task           String?
-  remarks        String? @db.Text
-
-  freonBefore   Float?
-  freonAfter    Float?
-  tempBefore    Float?
-  tempAfter     Float?
-  currentBefore Float?
-  currentAfter  Float?
-  images        OrderImage[]
 
   orderAddressId     Int?
   recipientAddressId Int?
@@ -466,31 +457,13 @@ model OrderImage {
   url    String
   isMain Boolean @default(false)
 
-  serviceCompleteId Int
-  serviceComplete   Order @relation(fields: [serviceCompleteId], references: [id], onDelete: Cascade)
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([serviceCompleteId])
-}
+  orderProduct   OrderProduct? @relation(fields: [orderProductId], references: [id])
+  orderProductId Int?
 
-model OrderAddress {
-  id              Int      @id @default(autoincrement())
-  uuid            String   @unique @default(uuid())
-  province        String
-  city            String
-  subDistrict     String
-  suburbOrVillage String
-  postalCode      String
-  label           String
-  address         String
-  details         String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  usedAsOrderAddress     Order[] @relation("Order_OrderAddress")
-  usedAsRecipientAddress Order[] @relation("Order_RecipientAddress")
+  @@index([orderProductId])
 }
 
 model OrderProduct {
@@ -518,6 +491,16 @@ model OrderProduct {
   updatedAt    DateTime            @updatedAt
   deletedAt    DateTime?
 
+  remarks String? @db.Text
+
+  freonBefore   Float?
+  freonAfter    Float?
+  tempBefore    Float?
+  tempAfter     Float?
+  currentBefore Float?
+  currentAfter  Float?
+  images        OrderImage[]
+
   orderProductImage OrderProductImage[]
 
   orderProductId        Int
@@ -533,6 +516,24 @@ model OrderProduct {
   bundleImage       String?
 
   @@index([deviceId])
+}
+
+model OrderAddress {
+  id              Int      @id @default(autoincrement())
+  uuid            String   @unique @default(uuid())
+  province        String
+  city            String
+  subDistrict     String
+  suburbOrVillage String
+  postalCode      String
+  label           String
+  address         String
+  details         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  usedAsOrderAddress     Order[] @relation("Order_OrderAddress")
+  usedAsRecipientAddress Order[] @relation("Order_RecipientAddress")
 }
 
 model OrderProductImage {

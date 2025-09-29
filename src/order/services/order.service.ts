@@ -58,6 +58,9 @@ import { TechnicianRepository } from 'src/technician/repositories/technician.rep
 import { DriverRepository } from 'src/driver/repositories/driver.repository';
 import * as luxon from 'luxon';
 import { getDay, getMonth } from 'helpers/date.helper';
+import * as path from 'path';
+import * as fs from 'fs/promises';
+import { genIdPrefixTimestamp, genSlug } from 'helpers/data.helper';
 
 @Injectable()
 export class OrderService {
@@ -1250,11 +1253,9 @@ export class OrderService {
 
   async setCompleteOrder(
     dto: SetCompleteOrderDto,
-    opts?: { mainPhoto?: Express.Multer.File; photos?: Express.Multer.File[] },
+    filesByItem: Express.Multer.File[][] = [],
   ) {
-    const { mainPhoto, photos = [] } = opts ?? {};
-    const { orderUuid, scheduleAt, productOrders, replaceImages, ...payload } =
-      dto;
+    const { orderUuid, scheduleAt, status, notes, items = [] } = dto;
 
     const scheduleAtDate = scheduleAt ? new Date(scheduleAt) : undefined;
     if (scheduleAt && isNaN(scheduleAtDate.getTime())) {
@@ -1264,83 +1265,87 @@ export class OrderService {
       });
     }
 
-    const imagesToCreate: { url: string; isMain: boolean }[] = [];
-    if (mainPhoto) {
-      const url = await this.orderRepository.saveLocalImage(mainPhoto);
-      imagesToCreate.push({ url, isMain: true });
-    }
-    for (const f of photos) {
-      const url = await await this.orderRepository.saveLocalImage(f);
-      imagesToCreate.push({ url, isMain: false });
-    }
-
     return this.prismaService.execTx(async (tx) => {
+      // pastikan order ada
       const order = await this.orderRepository.getThrowByUuid({
         uuid: orderUuid,
         select: { id: true },
         tx,
       });
 
-      const data: Prisma.OrderUpdateInput = {
-        status: payload.status,
-        scheduledAt: scheduleAtDate ?? undefined,
-        task: payload.task ?? undefined,
-        notes: payload.notes ?? undefined,
-        remarks: payload.remarks ?? undefined,
-        freonBefore: payload.freonBefore,
-        freonAfter: payload.freonAfter,
-        tempBefore: payload.tempBefore,
-        tempAfter: payload.tempAfter,
-        currentBefore: payload.currentBefore,
-        currentAfter: payload.currentAfter,
-        images:
-          imagesToCreate.length || replaceImages
-            ? {
-                ...(replaceImages ? { deleteMany: {} } : {}),
-                ...(imagesToCreate.length ? { create: imagesToCreate } : {}),
-              }
-            : undefined,
-      };
-
+      // update Order (hanya kolom yang ada di model Order)
       await this.orderRepository.update({
         where: { uuid: orderUuid },
-        data,
+        data: {
+          status: status ?? undefined,
+          notes: notes ?? undefined,
+          scheduledAt: scheduleAtDate ?? undefined,
+        },
         tx,
       });
 
-      if (productOrders?.length) {
-        const ids = productOrders.map((p) => p.orderProductUuid);
-        const found = await this.orderProductRepository.getMany({
-          where: { orderId: order.id, uuid: { in: ids } },
-          select: { uuid: true, deviceId: true },
+      if (!items.length) return null;
+
+      // validasi orderProduct milik order
+      const itemUuids = items.map((i) => i.orderProductUuid);
+      const existingItems = await this.orderProductRepository.getMany({
+        where: { orderId: order.id, uuid: { in: itemUuids } },
+        select: { id: true, uuid: true },
+        tx,
+      });
+      const ok = new Map(existingItems.map((x) => [x.uuid, x.id]));
+      const invalid = items.filter((i) => !ok.has(i.orderProductUuid));
+      if (invalid.length) {
+        throw new CustomError({
+          message:
+            'orderProductUuid tidak valid: ' +
+            invalid.map((x) => x.orderProductUuid).join(', '),
+          statusCode: 400,
+        });
+      }
+
+      // proses setiap item
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        const orderProductId = ok.get(it.orderProductUuid)!;
+
+        // upload images untuk item i
+        const files = filesByItem[i] ?? [];
+        const urls: string[] = [];
+        for (const f of files) {
+          urls.push(await this.saveLocalImage(f));
+        }
+
+        const imagesNested =
+          urls.length || it.replaceImages
+            ? {
+                ...(it.replaceImages ? { deleteMany: {} } : {}),
+                ...(urls.length
+                  ? {
+                      create: urls.map((url, idx) => ({
+                        url,
+                        isMain: idx === 0,
+                      })),
+                    }
+                  : {}),
+              }
+            : undefined;
+
+        await this.orderProductRepository.updateByUuid({
+          uuid: it.orderProductUuid,
+          data: {
+            deviceId: it.deviceId ?? undefined,
+            remarks: it.remarks ?? undefined,
+            freonBefore: it.freonBefore ?? undefined,
+            freonAfter: it.freonAfter ?? undefined,
+            tempBefore: it.tempBefore ?? undefined,
+            tempAfter: it.tempAfter ?? undefined,
+            currentBefore: it.currentBefore ?? undefined,
+            currentAfter: it.currentAfter ?? undefined,
+            images: imagesNested,
+          },
           tx,
         });
-        const valid = new Set(found.map((x) => x.uuid));
-        const invalid = productOrders.filter(
-          (p) => !valid.has(p.orderProductUuid),
-        );
-        if (invalid.length) {
-          throw new CustomError({
-            message: `orderProductUuid tidak valid: ${invalid
-              .map((i) => i.orderProductUuid)
-              .join(', ')}`,
-            statusCode: 400,
-          });
-        }
-        for (const p of productOrders) {
-          // device id must be unique
-          // if (found.some((f) => f.deviceId === p.deviceId)) {
-          //   throw new CustomError({
-          //     message: `deviceId ${p.deviceId} sudah digunakan`,
-          //     statusCode: 400,
-          //   });
-          // }
-          await this.orderProductRepository.updateByUuid({
-            uuid: p.orderProductUuid,
-            data: { deviceId: p.deviceId },
-            tx,
-          });
-        }
       }
 
       return null;
@@ -1629,5 +1634,25 @@ export class OrderService {
 
       return hourlyData;
     }
+  }
+
+  private async saveLocalImage(file: Express.Multer.File) {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const base = genSlug((file.originalname || '').replace(ext, ''));
+    const fileName = `${genIdPrefixTimestamp(base)}${ext || ''}`;
+    const dir = path.join(
+      process.cwd(),
+      'public',
+      'upload',
+      'order',
+      'complete',
+    );
+    await fs.mkdir(dir, { recursive: true });
+    const abs = path.join(dir, fileName);
+    const buf =
+      file.buffer ?? (file.path ? await fs.readFile(file.path) : null);
+    if (!buf) throw new Error('File kosong');
+    await fs.writeFile(abs, buf);
+    return `/upload/order/complete/${fileName}`;
   }
 }

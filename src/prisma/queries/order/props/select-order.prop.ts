@@ -316,13 +316,6 @@ export const selectOrderByUuid: Prisma.OrderSelect = {
 
   // NEW service-complete fields
   task: true,
-  remarks: true,
-  freonBefore: true,
-  freonAfter: true,
-  tempBefore: true,
-  tempAfter: true,
-  currentBefore: true,
-  currentAfter: true,
 
   // notes
   notes: true,
@@ -330,16 +323,6 @@ export const selectOrderByUuid: Prisma.OrderSelect = {
   // address
   orderAddress: { select: { address: true } },
   recipientAddress: true,
-
-  // images (NEW relation)
-  images: {
-    select: {
-      uuid: true,
-      url: true,
-      isMain: true,
-      createdAt: true,
-    },
-  },
 
   // order items
   orderProduct: {
@@ -365,6 +348,21 @@ export const selectOrderByUuid: Prisma.OrderSelect = {
       variantName: true,
       variantCode: true,
       variantImage: true,
+      remarks: true,
+      freonBefore: true,
+      freonAfter: true,
+      tempBefore: true,
+      tempAfter: true,
+      currentBefore: true,
+      currentAfter: true,
+      images: {
+        select: {
+          uuid: true,
+          url: true,
+          isMain: true,
+          createdAt: true,
+        },
+      },
 
       orderProductImage: {
         select: {
