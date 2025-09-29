@@ -138,6 +138,7 @@ export class ProductService {
                   serviceType,
                   isActive: parseFormBoolean(dto.isActive),
                   isHide: parseFormBoolean(dto.isHide),
+                  index: Number(dto.index),
                   rating: parseFloat(dto.rating ?? '0'),
                   type: typeConnect,
                   model: modelConnect,
@@ -166,6 +167,7 @@ export class ProductService {
                 isActive: parseFormBoolean(dto.isActive),
                 isHide: parseFormBoolean(dto.isHide),
                 rating: parseFloat(dto.rating ?? '0'),
+                index: Number(dto.index),
                 type: typeConnect,
                 model: modelConnect,
                 capacity: capacityConnect,
@@ -231,6 +233,7 @@ export class ProductService {
                 isHide: parseFormBoolean(dto.isHide),
                 price: finalPrice,
                 rating: parseFloat(dto.rating ?? '0'),
+                index: Number(dto.index),
                 bundleImage:
                   (bundleImageRows?.length ?? 0) > 0
                     ? { create: bundleImageRows }
@@ -532,6 +535,7 @@ export class ProductService {
             rating: parseFloat(dto.rating ?? '0'),
             isActive: parseFormBoolean(dto.isActive),
             isHide: parseFormBoolean(dto.isHide),
+            index: Number(dto.index),
             serviceType: dto.serviceType ?? undefined,
             type: typeConnect,
             model: modelConnect,
@@ -636,6 +640,7 @@ export class ProductService {
               isHide: parseFormBoolean(dto.isHide),
               price: typeof newPrice === 'number' ? newPrice : undefined,
               rating: parseFloat(dto.rating ?? '0'),
+              index: Number(dto.index),
               bundleImage: {
                 ...(imageDeleteData ? imageDeleteData : {}),
                 ...((bundleImageRows?.length ?? 0) > 0

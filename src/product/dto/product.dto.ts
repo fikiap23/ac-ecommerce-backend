@@ -113,6 +113,10 @@ export class CreateProductDto {
   @IsOptional()
   isHide?: string;
 
+  @IsOptional()
+  @IsNumber()
+  index?: number;
+
   @ValidateIf((o) => o.serviceType === TypeProductService.PRODUCT)
   @IsArray()
   @ArrayMinSize(1)
