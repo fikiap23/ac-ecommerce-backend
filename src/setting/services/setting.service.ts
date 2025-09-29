@@ -59,7 +59,9 @@ export class SettingService {
     dto: UpsertSettingDto,
     files?: { logo?: Express.Multer.File; socialIcons?: Express.Multer.File[] },
   ) {
-    const existing = await this.siteRepo.getFirst({ select: { id: true } });
+    const existing = await this.siteRepo.getFirst({
+      select: { id: true, socialMedias: { select: { uuid: true } } },
+    });
 
     const logoUrl = files?.logo
       ? await this.saveLocalImage(files.logo, ['site', 'logo'])
@@ -73,15 +75,15 @@ export class SettingService {
         )
       : [];
 
-    const socials = (dto.socialMedias ?? []).map((s, i) => ({
-      username: s.username,
-      icon: iconUrls[i] ?? undefined,
-      url: s.url ?? undefined,
-      order: s.order ?? i,
-      isActive: s.isActive ?? true,
-    }));
-
     if (!existing) {
+      const socialsForCreate = (dto.socialMedias ?? []).map((s, i) => ({
+        username: s.username,
+        icon: iconUrls[i],
+        url: s.url,
+        order: s.order ?? i,
+        isActive: s.isActive ?? true,
+      }));
+
       return this.siteRepo.create({
         data: {
           logo: logoUrl,
@@ -90,8 +92,45 @@ export class SettingService {
           email: dto.email,
           address: dto.address,
           copyrightText: dto.copyrightText,
-          socialMedias: socials.length ? { create: socials } : undefined,
+          socialMedias: socialsForCreate.length
+            ? { create: socialsForCreate }
+            : undefined,
         } as Prisma.SiteSettingCreateInput,
+      });
+    }
+
+    const existingUuidSet = new Set(
+      (existing.socialMedias ?? []).map((s) => s.uuid),
+    );
+
+    const updates: Prisma.SettingSocialUpdateWithWhereUniqueWithoutSettingInput[] =
+      [];
+    const creates: Prisma.SettingSocialCreateWithoutSettingInput[] = [];
+
+    if (dto.socialMedias !== undefined) {
+      (dto.socialMedias ?? []).forEach((s, i) => {
+        const uploadedIcon = iconUrls[i];
+        if (s.uuid && existingUuidSet.has(s.uuid)) {
+          updates.push({
+            where: { uuid: s.uuid },
+            data: {
+              username: s.username,
+              ...(uploadedIcon !== undefined ? { icon: uploadedIcon } : {}),
+              url: s.url,
+              order: s.order ?? i,
+              isActive: s.isActive ?? true,
+            },
+          });
+        } else {
+          // CREATE item baru
+          creates.push({
+            username: s.username,
+            ...(uploadedIcon !== undefined ? { icon: uploadedIcon } : {}),
+            url: s.url,
+            order: s.order ?? i,
+            isActive: s.isActive ?? true,
+          });
+        }
       });
     }
 
@@ -100,9 +139,10 @@ export class SettingService {
       | undefined =
       dto.socialMedias === undefined
         ? undefined
-        : socials.length
-        ? { deleteMany: {}, create: socials }
-        : { deleteMany: {} };
+        : {
+            ...(updates.length ? { update: updates } : {}),
+            ...(creates.length ? { create: creates } : {}),
+          };
 
     return this.siteRepo.updateById({
       id: existing.id,
