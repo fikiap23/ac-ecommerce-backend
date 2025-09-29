@@ -52,7 +52,7 @@ export class SettingController {
 
     const logo = files.find((f) => f.fieldname === 'logo');
 
-    const iconRegex = /^socialMedias\[(\d+)]\[icon]$/;
+    const iconRegex = /^socialMedias\[(\d+)\](?:\[icon\]|\.icon)$/;
     const socialIconsOrdered: Express.Multer.File[] = files
       .map((f) => {
         const m = f.fieldname.match(iconRegex);

@@ -41,39 +41,41 @@ export class SettingService {
     return data ?? null;
   }
 
-  private async saveLocalImage(file: Express.Multer.File) {
+  private async saveLocalImage(file: Express.Multer.File, subPath: string[]) {
     const ext = path.extname(file.originalname || '').toLowerCase();
     const base = genSlug((file.originalname || '').replace(ext, ''));
     const fileName = `${genIdPrefixTimestamp(base)}${ext || ''}`;
-
-    const dir = path.join(process.cwd(), 'public', 'upload', 'site', 'logo');
+    const dir = path.join(process.cwd(), 'public', 'upload', ...subPath);
     await fs.mkdir(dir, { recursive: true });
-
     const absPath = path.join(dir, fileName);
     const content =
       file.buffer ?? (file.path ? await fs.readFile(file.path) : null);
     if (!content) throw new Error('File kosong');
-
     await fs.writeFile(absPath, content);
-    return `/upload/site/logo/${fileName}`;
+    return `/upload/${subPath.join('/')}/${fileName}`;
   }
 
   async saveSetting(
     dto: UpsertSettingDto,
     files?: { logo?: Express.Multer.File; socialIcons?: Express.Multer.File[] },
   ) {
-    const existing = await this.siteRepo.getFirst({});
+    const existing = await this.siteRepo.getFirst({ select: { id: true } });
+
     const logoUrl = files?.logo
-      ? await this.saveLocalImage(files.logo)
+      ? await this.saveLocalImage(files.logo, ['site', 'logo'])
       : undefined;
 
     const iconUrls = files?.socialIcons?.length
-      ? await Promise.all(files.socialIcons.map((f) => this.saveLocalImage(f)))
+      ? await Promise.all(
+          files.socialIcons.map((f) =>
+            this.saveLocalImage(f, ['site', 'social']),
+          ),
+        )
       : [];
 
     const socials = (dto.socialMedias ?? []).map((s, i) => ({
       username: s.username,
-      icon: iconUrls[i] ?? null,
+      icon: iconUrls[i] ?? null, // file yang diupload (kalau ada); null = kosongkan
       url: s.url ?? null,
       order: s.order ?? i,
       isActive: s.isActive ?? true,
@@ -93,6 +95,15 @@ export class SettingService {
       });
     }
 
+    const socialOps:
+      | Prisma.SettingSocialUpdateManyWithoutSettingNestedInput
+      | undefined =
+      dto.socialMedias === undefined
+        ? undefined
+        : socials.length
+        ? { deleteMany: {}, create: socials }
+        : { deleteMany: {} };
+
     return this.siteRepo.updateById({
       id: existing.id,
       data: {
@@ -102,9 +113,7 @@ export class SettingService {
         email: dto.email,
         address: dto.address,
         copyrightText: dto.copyrightText,
-        socialMedias: socials.length
-          ? { deleteMany: {}, create: socials }
-          : { deleteMany: {} },
+        ...(socialOps ? { socialMedias: socialOps } : {}),
       } as Prisma.SiteSettingUpdateInput,
     });
   }

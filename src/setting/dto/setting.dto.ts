@@ -10,6 +10,10 @@ import {
 } from 'class-validator';
 
 export class SocialItemDto {
+  @IsOptional()
+  @IsString()
+  uuid?: string;
+
   @IsString()
   username: string;
 
