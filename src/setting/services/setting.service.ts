@@ -5,10 +5,14 @@ import { UpsertSettingDto } from '../dto/setting.dto';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { genSlug, genIdPrefixTimestamp } from 'helpers/data.helper';
+import { SettingSocialRepository } from '../repositories/setting-social.repository';
 
 @Injectable()
 export class SettingService {
-  constructor(private readonly siteRepo: SiteSettingRepository) {}
+  constructor(
+    private readonly siteRepo: SiteSettingRepository,
+    private readonly settingSocialRepo: SettingSocialRepository,
+  ) {}
 
   private readonly selectSetting: Prisma.SiteSettingSelect = {
     uuid: true,
@@ -55,9 +59,20 @@ export class SettingService {
     return `/upload/${subPath.join('/')}/${fileName}`;
   }
 
+  private async deleteLocalIfExists(relUrl?: string) {
+    if (!relUrl || !relUrl.startsWith('/upload/')) return;
+    const abs = path.join(process.cwd(), 'public', relUrl.replace(/^\//, ''));
+    try {
+      await fs.unlink(abs);
+    } catch {}
+  }
+
   async saveSetting(
     dto: UpsertSettingDto,
-    files?: { logo?: Express.Multer.File; socialIcons?: Express.Multer.File[] },
+    files?: {
+      logo?: Express.Multer.File;
+      socialIcons?: { index: number; file: Express.Multer.File }[];
+    },
   ) {
     const existing = await this.siteRepo.getFirst({
       select: { id: true, socialMedias: { select: { uuid: true } } },
@@ -67,31 +82,32 @@ export class SettingService {
       ? await this.saveLocalImage(files.logo, ['site', 'logo'])
       : undefined;
 
-    const iconUrls = files?.socialIcons?.length
-      ? await Promise.all(
-          files.socialIcons.map((f) =>
-            this.saveLocalImage(f, ['site', 'social']),
-          ),
-        )
-      : [];
+    // === map index → url agar tidak salah sasaran ===
+    const iconUrlByIndex = new Map<number, string>();
+    if (files?.socialIcons?.length) {
+      for (const { index, file } of files.socialIcons) {
+        const url = await this.saveLocalImage(file, ['site', 'social']);
+        iconUrlByIndex.set(index, url);
+      }
+    }
 
     if (!existing) {
       const socialsForCreate = (dto.socialMedias ?? []).map((s, i) => ({
         username: s.username,
-        icon: iconUrls[i],
-        url: s.url,
+        icon: iconUrlByIndex.get(i) ?? null, // create: pakai url jika ada, else null
+        url: s.url ?? null,
         order: s.order ?? i,
         isActive: s.isActive ?? true,
       }));
 
       return this.siteRepo.create({
         data: {
-          logo: logoUrl,
-          description: dto.description,
-          phone: dto.phone,
-          email: dto.email,
-          address: dto.address,
-          copyrightText: dto.copyrightText,
+          logo: logoUrl ?? null,
+          description: dto.description ?? null,
+          phone: dto.phone ?? null,
+          email: dto.email ?? null,
+          address: dto.address ?? null,
+          copyrightText: dto.copyrightText ?? null,
           socialMedias: socialsForCreate.length
             ? { create: socialsForCreate }
             : undefined,
@@ -109,24 +125,23 @@ export class SettingService {
 
     if (dto.socialMedias !== undefined) {
       (dto.socialMedias ?? []).forEach((s, i) => {
-        const uploadedIcon = iconUrls[i];
+        const newIcon = iconUrlByIndex.get(i);
         if (s.uuid && existingUuidSet.has(s.uuid)) {
           updates.push({
             where: { uuid: s.uuid },
             data: {
               username: s.username,
-              ...(uploadedIcon !== undefined ? { icon: uploadedIcon } : {}),
-              url: s.url,
+              ...(newIcon !== undefined ? { icon: newIcon } : {}), // update icon hanya jika file dikirim untuk index ini
+              url: s.url ?? undefined,
               order: s.order ?? i,
               isActive: s.isActive ?? true,
             },
           });
         } else {
-          // CREATE item baru
           creates.push({
             username: s.username,
-            ...(uploadedIcon !== undefined ? { icon: uploadedIcon } : {}),
-            url: s.url,
+            icon: newIcon ?? null, // create: set url bila ada, kalau tidak biarkan null
+            url: s.url ?? null,
             order: s.order ?? i,
             isActive: s.isActive ?? true,
           });
@@ -156,5 +171,15 @@ export class SettingService {
         ...(socialOps ? { socialMedias: socialOps } : {}),
       } as Prisma.SiteSettingUpdateInput,
     });
+  }
+
+  async deleteSocialByUuid(uuid: string) {
+    const social = await this.settingSocialRepo.getThrowByUuid({
+      uuid,
+      select: { uuid: true, icon: true },
+    });
+    await this.deleteLocalIfExists(social.icon ?? undefined);
+    await this.settingSocialRepo.deleteByUuid({ uuid });
+    return null;
   }
 }

@@ -5,8 +5,10 @@ import { errorHandler } from 'helpers/validation.helper';
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpStatus,
+  Param,
   Patch,
   Post,
   Res,
@@ -52,19 +54,29 @@ export class SettingController {
 
     const logo = files.find((f) => f.fieldname === 'logo');
 
-    const iconRegex = /^socialMedias\[(\d+)\](?:\[icon\]|\.icon)$/;
-    const socialIconsOrdered: Express.Multer.File[] = files
+    const iconRegex = /^socialMedias\[(\d+)]\[icon]$/;
+    const socialIconsIndexed = files
       .map((f) => {
         const m = f.fieldname.match(iconRegex);
-        return m ? { i: Number(m[1]), f } : null;
+        return m ? { index: Number(m[1]), file: f } : null;
       })
-      .filter(Boolean)
-      .sort((a, b) => a!.i - b!.i)
-      .map((x) => x!.f);
+      .filter((x): x is { index: number; file: Express.Multer.File } => !!x);
 
     return this.settingService.saveSetting(dto, {
       logo,
-      socialIcons: socialIconsOrdered,
+      socialIcons: socialIconsIndexed,
     });
+  }
+
+  @UseGuards(JwtGuard, RoleGuard)
+  @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN)
+  @Delete('social/:uuid')
+  async deleteSocial(@Param('uuid') uuid: string, @Res() res: Response) {
+    try {
+      await this.settingService.deleteSocialByUuid(uuid);
+      return formatResponse(res, HttpStatus.OK, null);
+    } catch (error) {
+      return errorHandler(res, error);
+    }
   }
 }
