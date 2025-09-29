@@ -38,7 +38,7 @@ export class SettingService {
       select: this.selectSetting,
       where: {},
     });
-    return data ?? null;
+    return data;
   }
 
   private async saveLocalImage(file: Express.Multer.File, subPath: string[]) {
@@ -75,8 +75,8 @@ export class SettingService {
 
     const socials = (dto.socialMedias ?? []).map((s, i) => ({
       username: s.username,
-      icon: iconUrls[i] ?? null, // file yang diupload (kalau ada); null = kosongkan
-      url: s.url ?? null,
+      icon: iconUrls[i] ?? undefined,
+      url: s.url ?? undefined,
       order: s.order ?? i,
       isActive: s.isActive ?? true,
     }));
@@ -84,12 +84,12 @@ export class SettingService {
     if (!existing) {
       return this.siteRepo.create({
         data: {
-          logo: logoUrl ?? null,
-          description: dto.description ?? null,
-          phone: dto.phone ?? null,
-          email: dto.email ?? null,
-          address: dto.address ?? null,
-          copyrightText: dto.copyrightText ?? null,
+          logo: logoUrl,
+          description: dto.description,
+          phone: dto.phone,
+          email: dto.email,
+          address: dto.address,
+          copyrightText: dto.copyrightText,
           socialMedias: socials.length ? { create: socials } : undefined,
         } as Prisma.SiteSettingCreateInput,
       });
