@@ -19,15 +19,15 @@ async function bootstrap() {
 
   app.use(
     '/upload',
-    express.static(uploadRoot, {
+    express.static(join(process.cwd(), 'public', 'upload'), {
       setHeaders: (res) => {
         res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,OPTIONS');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
         res.setHeader(
           'Access-Control-Allow-Headers',
-          'Content-Type,Authorization',
+          'Content-Type, Authorization',
         );
-        res.setHeader('Cache-Control', 'public, max-age=300');
+        res.setHeader('Vary', 'Origin');
       },
     }),
   );
