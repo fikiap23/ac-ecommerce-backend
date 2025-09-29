@@ -3,6 +3,7 @@ import { ProductRepository } from '../repositories/product.repository';
 import {
   CreateProductDto,
   RemoveVariantDto,
+  ReorderCatalogDto,
   UpdateProductDto,
 } from '../dto/product.dto';
 import {
@@ -719,5 +720,80 @@ export class ProductService {
     });
 
     return product;
+  }
+
+  async reorderCatalog(dto: ReorderCatalogDto) {
+    const items = dto.items || [];
+    if (!items.length) return { updatedProduct: 0, updatedBundle: 0 };
+
+    const uuids = items.map((i) => i.uuid);
+    const desired = new Map(items.map((i) => [i.uuid, i.index]));
+
+    // Ambil yang ketemu di masing2 tabel
+    const [prods, bundles] = await this.prisma.$transaction([
+      this.prisma.product.findMany({
+        where: { uuid: { in: uuids } },
+        select: { uuid: true, index: true },
+      }),
+      this.prisma.bundle.findMany({
+        where: { uuid: { in: uuids } },
+        select: { uuid: true, index: true },
+      }),
+    ]);
+
+    // Validasi: semua uuid harus ketemu persis di salah satu tabel
+    const foundUuids = new Set([
+      ...prods.map((p) => p.uuid),
+      ...bundles.map((b) => b.uuid),
+    ]);
+    const missing = uuids.filter((u) => !foundUuids.has(u));
+    if (missing.length) {
+      throw new Error(`UUID not found: ${missing.join(', ')}`);
+    }
+
+    // (opsional) deteksi bentrok ganda: satu uuid muncul di dua tabel — mestinya ga terjadi
+    const prodSet = new Set(prods.map((p) => p.uuid));
+    const dupAcrossTables = bundles
+      .map((b) => b.uuid)
+      .filter((u) => prodSet.has(u));
+    if (dupAcrossTables.length) {
+      throw new Error(
+        `UUID exists in both product & bundle: ${dupAcrossTables.join(', ')}`,
+      );
+    }
+
+    // Kumpulkan perubahan saja
+    const prodChanges = prods
+      .filter((p) => p.index !== desired.get(p.uuid))
+      .map((p) => ({ uuid: p.uuid, index: desired.get(p.uuid)! }));
+
+    const bundleChanges = bundles
+      .filter((b) => b.index !== desired.get(b.uuid))
+      .map((b) => ({ uuid: b.uuid, index: desired.get(b.uuid)! }));
+
+    if (!prodChanges.length && !bundleChanges.length) {
+      return { updatedProduct: 0, updatedBundle: 0 };
+    }
+
+    // Update dalam satu transaksi
+    await this.prisma.$transaction([
+      ...prodChanges.map((c) =>
+        this.prisma.product.update({
+          where: { uuid: c.uuid },
+          data: { index: c.index },
+        }),
+      ),
+      ...bundleChanges.map((c) =>
+        this.prisma.bundle.update({
+          where: { uuid: c.uuid },
+          data: { index: c.index },
+        }),
+      ),
+    ]);
+
+    return {
+      updatedProduct: prodChanges.length,
+      updatedBundle: bundleChanges.length,
+    };
   }
 }

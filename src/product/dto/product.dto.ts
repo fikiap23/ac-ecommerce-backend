@@ -9,6 +9,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Min,
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
@@ -210,4 +211,20 @@ export class RemoveVariantDto {
 
   @IsString()
   uuidVariant: string;
+}
+
+export class IndexItemDto {
+  @IsString()
+  uuid: string;
+
+  @IsInt()
+  @Min(0)
+  index: number;
+}
+
+export class ReorderCatalogDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => IndexItemDto)
+  items: IndexItemDto[];
 }

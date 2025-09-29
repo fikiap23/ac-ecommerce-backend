@@ -5,6 +5,7 @@ import {
   Get,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -22,6 +23,7 @@ import {
   CreateProductDto,
   QueryProductDto,
   RemoveVariantDto,
+  ReorderCatalogDto,
   UpdateProductDto,
 } from '../dto/product.dto';
 import { formatResponse } from 'helpers/http.helper';
@@ -104,6 +106,18 @@ export class ProductController {
       return formatResponse(res, HttpStatus.OK, result.data, result.meta);
     } catch (error) {
       errorHandler(res, error);
+    }
+  }
+
+  @UseGuards(JwtGuard, RoleGuard)
+  @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN)
+  @Patch('product/index')
+  async reorderCatalog(@Body() dto: ReorderCatalogDto, @Res() res: Response) {
+    try {
+      const result = await this.productService.reorderCatalog(dto);
+      return formatResponse(res, HttpStatus.OK, result);
+    } catch (error) {
+      return errorHandler(res, error);
     }
   }
 
