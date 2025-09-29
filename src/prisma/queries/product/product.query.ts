@@ -108,6 +108,7 @@ export class ProductQuery extends PrismaService {
           isActive: true,
           createdAt: true,
           bundleImage: { select: { url: true } },
+          index: true,
           items: {
             select: {
               product: {
