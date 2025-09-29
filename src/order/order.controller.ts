@@ -34,7 +34,6 @@ import { OrderPaymentMethodService } from './services/order-payment-method.servi
 import { IOrderPayment } from './interfaces/order.interface';
 import { AuthService } from 'src/auth/auth.service';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
-import { SearchPaginationDto } from 'utils/dto/pagination.dto';
 
 @Controller()
 export class OrderController {
