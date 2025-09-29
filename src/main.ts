@@ -1,24 +1,38 @@
-import * as bodyParser from 'body-parser';
 import { join } from 'path';
 import { AppModule } from './app.module';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import * as express from 'express';
-
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-});
+import * as bodyParser from 'body-parser';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    cors: true,
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  app.enableCors({
+    origin: '*', // semua origin
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
-  app.use('/upload', express.static(join(process.cwd(), 'public', 'upload')));
+
+  const uploadRoot = join(process.cwd(), 'public', 'upload');
+
+  app.use(
+    '/upload',
+    express.static(uploadRoot, {
+      setHeaders: (res) => {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,OPTIONS');
+        res.setHeader(
+          'Access-Control-Allow-Headers',
+          'Content-Type,Authorization',
+        );
+        res.setHeader('Cache-Control', 'public, max-age=300');
+      },
+    }),
+  );
+
+  // === Validasi global ===
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
@@ -41,5 +55,4 @@ async function bootstrap() {
 
   await app.listen(3000);
 }
-
 bootstrap();
