@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, TypeProductService } from '@prisma/client';
 import { OrderProductQuery } from 'src/prisma/queries/order/order-product.query';
 import { IDeviceListFilter } from '../interfaces/order.interface';
 
@@ -56,6 +56,7 @@ export class OrderProductRepository {
         orderId ? { orderId } : undefined,
         { deviceId: { not: null } },
         { order: { customerId: filter.customerId } },
+        { serviceType: TypeProductService.PRODUCT },
         search
           ? {
               OR: [
@@ -75,5 +76,17 @@ export class OrderProductRepository {
       page,
       limit,
     });
+  }
+
+  async getManyDevice({
+    tx,
+    where,
+    select,
+  }: {
+    tx?: Prisma.TransactionClient;
+    where?: Prisma.OrderProductWhereInput;
+    select?: Prisma.OrderProductSelect;
+  }) {
+    return await this.orderProductQuery.findDeviceMany({ tx, where, select });
   }
 }

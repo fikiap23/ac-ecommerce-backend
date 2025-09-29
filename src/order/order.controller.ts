@@ -243,4 +243,21 @@ export class OrderController {
       return errorHandler(res, error);
     }
   }
+
+  @UseGuards(JwtGuard)
+  @Get('device/:id')
+  async getDeviceById(
+    @Param('id') id: string,
+    @Headers('authorization') authorization: string,
+    @Res() res: Response,
+  ) {
+    try {
+      const { sub } = await this.authService.decodeJwtToken(authorization);
+      const result = await this.orderService.getManyDeviceById(sub, id);
+
+      return formatResponse(res, HttpStatus.OK, result);
+    } catch (error) {
+      return errorHandler(res, error);
+    }
+  }
 }

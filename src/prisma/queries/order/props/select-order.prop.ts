@@ -426,6 +426,8 @@ export const selectGeneralTrackOrderUuid: Prisma.OrderSelect = {
 export const selectOrderProductDevice: Prisma.OrderProductSelect = {
   uuid: true,
   name: true,
+  packageType: true,
+  serviceType: true,
   variantName: true,
   variantCode: true,
   variantImage: true,

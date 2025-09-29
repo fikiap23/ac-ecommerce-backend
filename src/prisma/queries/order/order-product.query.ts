@@ -54,4 +54,17 @@ export class OrderProductQuery extends PrismaService {
       { page, perPage: limit },
     );
   }
+
+  async findDeviceMany({
+    tx,
+    where,
+    select,
+  }: {
+    tx?: Prisma.TransactionClient;
+    where?: Prisma.OrderProductWhereInput;
+    select?: Prisma.OrderProductSelect;
+  }) {
+    const prisma = tx ?? this;
+    return await prisma.orderProduct.findMany({ where, select });
+  }
 }

@@ -1359,6 +1359,20 @@ export class OrderService {
     });
   }
 
+  async getManyDeviceById(sub: string, deviceId: string) {
+    const customer = await this.customerRepository.getThrowByUuid({
+      uuid: sub,
+    });
+    return this.orderProductRepository.getManyDevice({
+      where: {
+        deviceId,
+        order: {
+          customerId: customer.id,
+        },
+      },
+    });
+  }
+
   async getSummary(filter: IFilterReportSummary) {
     const balance = await this.orderRepository.aggregate({
       _sum: {
