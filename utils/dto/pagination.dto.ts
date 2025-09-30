@@ -18,5 +18,5 @@ export class PaginationDto {
 export class SearchPaginationDto extends PaginationDto {
   @IsOptional()
   @IsString()
-  search: string;
+  search?: string;
 }

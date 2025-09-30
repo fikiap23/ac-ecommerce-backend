@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TestimonialRepository } from '../repositories/testimonial.repository';
 import {
   CreateTestimonialDto,
+  SearchTestimonialDto,
   UpdateTestimonialDto,
 } from '../dto/testimonial.dto';
 import { IFilterTestimonial } from '../interface/testimonial.interface';
@@ -55,9 +56,18 @@ export class TestimonialService {
     });
   }
 
-  async getAll(filter: IFilterTestimonial) {
+  async getAll(filter: SearchTestimonialDto) {
+    const product = await this.productRepository.getThrowByUuid({
+      uuid: filter.productUuid,
+    });
     return await this.testimonialRepository.getManyPaginate({
-      filter,
+      filter: {
+        limit: filter.limit,
+        page: filter.page,
+        sort: filter.sort,
+        productId: product.id,
+        search: filter.search,
+      },
       select: selectGeneralTestimonial,
     });
   }

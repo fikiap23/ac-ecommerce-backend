@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
+import { SearchPaginationDto } from 'utils/dto/pagination.dto';
 
 export class CreateTestimonialDto {
   @IsString()
@@ -39,3 +40,13 @@ export class CreateTestimonialDto {
 }
 
 export class UpdateTestimonialDto extends PartialType(CreateTestimonialDto) {}
+
+export class SearchTestimonialDto extends SearchPaginationDto {
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsString()
+  productUuid?: string;
+}

@@ -8,4 +8,5 @@ export type IFilterTestimonial = {
   page: number;
   limit: number;
   search?: string;
+  productId?: number;
 };

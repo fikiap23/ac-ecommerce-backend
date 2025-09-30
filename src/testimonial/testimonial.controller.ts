@@ -57,12 +57,7 @@ export class TestimonialController {
   @Get()
   async getAll(@Query() queries: SearchPaginationDto, @Res() res: Response) {
     try {
-      const result = await this.testimonialService.getAll({
-        sort: queries.sort,
-        page: queries.page,
-        limit: queries.limit,
-        search: queries.search,
-      });
+      const result = await this.testimonialService.getAll(queries);
       return formatResponse(res, HttpStatus.OK, result.data, result.meta);
     } catch (error) {
       errorHandler(res, error);
