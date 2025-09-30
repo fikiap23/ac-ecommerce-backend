@@ -37,6 +37,7 @@ import {
   selectGeneralTrackOrderUuid,
   selectOrderByUuid,
   selectOrderCreate,
+  selectOrderProductDevice,
   selectTrackIdAndStatus,
 } from 'src/prisma/queries/order/props/select-order.prop';
 import { selectProductForCreateOrder } from 'src/prisma/queries/product/props/select-product.prop';
@@ -1375,6 +1376,7 @@ export class OrderService {
           customerId: customer.id,
         },
       },
+      select: selectOrderProductDevice,
     });
   }
 
