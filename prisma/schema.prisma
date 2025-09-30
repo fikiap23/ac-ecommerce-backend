@@ -493,13 +493,15 @@ model OrderProduct {
 
   remarks String? @db.Text
 
-  freonBefore   Float?
-  freonAfter    Float?
-  tempBefore    Float?
-  tempAfter     Float?
-  currentBefore Float?
-  currentAfter  Float?
-  images        OrderImage[]
+  technicianId   Int?
+  technicianName String?
+  freonBefore    Float?
+  freonAfter     Float?
+  tempBefore     Float?
+  tempAfter      Float?
+  currentBefore  Float?
+  currentAfter   Float?
+  images         OrderImage[]
 
   orderProductImage OrderProductImage[]
 

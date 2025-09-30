@@ -255,10 +255,13 @@ export class SetCompleteOrderItemDto {
   @IsOptional() @IsNumber() currentBefore?: number;
   @IsOptional() @IsNumber() currentAfter?: number;
 
-  // kalau true → hapus semua gambar lama OrderProduct ini dulu
   @IsOptional()
   @IsBoolean()
   replaceImages?: boolean;
+
+  @IsOptional()
+  @IsString()
+  technicianUuid?: string;
 }
 
 export class SetCompleteOrderDto {

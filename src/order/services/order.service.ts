@@ -1274,7 +1274,7 @@ export class OrderService {
         tx,
       });
 
-      // update Order (hanya kolom yang ada di model Order)
+      // update kolom milik Order
       await this.orderRepository.update({
         where: { uuid: orderUuid },
         data: {
@@ -1287,7 +1287,7 @@ export class OrderService {
 
       if (!items.length) return null;
 
-      // validasi orderProduct milik order
+      // validasi semua orderProduct milik order
       const itemUuids = items.map((i) => i.orderProductUuid);
       const existingItems = await this.orderProductRepository.getMany({
         where: { orderId: order.id, uuid: { in: itemUuids } },
@@ -1305,16 +1305,41 @@ export class OrderService {
         });
       }
 
-      // proses setiap item
+      // ambil semua technicianUuid unik (jika ada) lalu resolve -> id & name
+      const techUuids = Array.from(
+        new Set(items.map((i) => i.technicianUuid).filter(Boolean) as string[]),
+      );
+
+      let techMap = new Map<string, { id: number; name: string | null }>();
+      if (techUuids.length) {
+        const techs = await this.technicianRepository.getMany({
+          where: { uuid: { in: techUuids } },
+          select: { uuid: true, id: true, name: true },
+          tx,
+        });
+        const found = new Set(techs.map((t) => t.uuid));
+        const missing = techUuids.filter((u) => !found.has(u));
+        if (missing.length) {
+          throw new CustomError({
+            message: `technicianUuid tidak valid: ${missing.join(', ')}`,
+            statusCode: 400,
+          });
+        }
+        techMap = new Map(
+          techs.map((t) => [t.uuid, { id: t.id, name: t.name }]),
+        );
+      }
+
+      // proses tiap OrderProduct
       for (let i = 0; i < items.length; i++) {
         const it = items[i];
         const orderProductId = ok.get(it.orderProductUuid)!;
 
-        // upload images untuk item i
+        // simpan images untuk item i
         const files = filesByItem[i] ?? [];
         const urls: string[] = [];
         for (const f of files) {
-          urls.push(await this.saveLocalImage(f));
+          urls.push(await this.saveLocalImage(f)); // index 0 = main
         }
 
         const imagesNested =
@@ -1332,6 +1357,15 @@ export class OrderService {
               }
             : undefined;
 
+        // siapkan payload teknisi (per item)
+        let technicianId: number | undefined;
+        let technicianName: string | null | undefined;
+        if (it.technicianUuid) {
+          const t = techMap.get(it.technicianUuid);
+          technicianId = t?.id;
+          technicianName = t?.name ?? null;
+        }
+
         await this.orderProductRepository.updateByUuid({
           uuid: it.orderProductUuid,
           data: {
@@ -1344,6 +1378,10 @@ export class OrderService {
             currentBefore: it.currentBefore ?? undefined,
             currentAfter: it.currentAfter ?? undefined,
             images: imagesNested,
+
+            technicianId: technicianId !== undefined ? technicianId : undefined,
+            technicianName:
+              technicianName !== undefined ? technicianName : undefined,
           },
           tx,
         });
