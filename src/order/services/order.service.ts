@@ -504,6 +504,10 @@ export class OrderService {
                 category: categoryName,
                 orderProductId: p.id,
                 orderProductVariantId: isProductType ? variant!.id : undefined,
+                orderProductUuid: ci.productUuid,
+                orderProductVariantUuid: isProductType
+                  ? ci.productVariantUuid
+                  : undefined,
                 quantity: ci.quantity,
                 discount: 0,
 

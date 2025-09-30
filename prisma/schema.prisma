@@ -505,8 +505,10 @@ model OrderProduct {
 
   orderProductImage OrderProductImage[]
 
-  orderProductId        Int
-  orderProductVariantId Int?
+  orderProductId          Int
+  orderProductVariantId   Int?
+  orderProductUuid        String?
+  orderProductVariantUuid String?
 
   order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderId Int
