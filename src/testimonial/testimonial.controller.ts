@@ -20,6 +20,7 @@ import { Roles } from 'src/auth/decorator';
 import { TypeRoleAdmin, TypeRoleUser } from '@prisma/client';
 import {
   CreateTestimonialDto,
+  SearchTestimonialDto,
   UpdateTestimonialDto,
 } from './dto/testimonial.dto';
 import { formatResponse } from 'helpers/http.helper';
@@ -55,7 +56,7 @@ export class TestimonialController {
   }
 
   @Get()
-  async getAll(@Query() queries: SearchPaginationDto, @Res() res: Response) {
+  async getAll(@Query() queries: SearchTestimonialDto, @Res() res: Response) {
     try {
       const result = await this.testimonialService.getAll(queries);
       return formatResponse(res, HttpStatus.OK, result.data, result.meta);

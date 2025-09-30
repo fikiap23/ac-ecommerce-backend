@@ -57,15 +57,20 @@ export class TestimonialService {
   }
 
   async getAll(filter: SearchTestimonialDto) {
-    const product = await this.productRepository.getThrowByUuid({
-      uuid: filter.productUuid,
-    });
+    let productId = undefined;
+    if (filter.productUuid) {
+      const product = await this.productRepository.getThrowByUuid({
+        uuid: filter.productUuid,
+        select: { id: true },
+      });
+      productId = product.id;
+    }
     return await this.testimonialRepository.getManyPaginate({
       filter: {
         limit: filter.limit,
         page: filter.page,
         sort: filter.sort,
-        productId: product.id,
+        productId,
         search: filter.search,
       },
       select: selectGeneralTestimonial,
