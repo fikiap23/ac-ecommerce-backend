@@ -276,7 +276,12 @@ export class OrderController {
     @Res() res: Response,
   ) {
     try {
-      const { sub } = await this.authService.decodeJwtToken(authorization);
+      let { sub, role } = await this.authService.decodeJwtToken(authorization);
+
+      if (role === TypeRoleAdmin.ADMIN || role === TypeRoleAdmin.SUPER_ADMIN) {
+        sub = undefined;
+      }
+
       const result = await this.orderService.getManyDeviceById(sub, id);
 
       return formatResponse(res, HttpStatus.OK, result);
