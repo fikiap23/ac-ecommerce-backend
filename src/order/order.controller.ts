@@ -115,7 +115,6 @@ export class OrderController {
     @Res() res: Response,
   ) {
     try {
-      // Expect: items[0][images], items[0][images] (repeatable), items[1][images], ...
       const imgRe = /^items\[(\d+)]\[images]$/;
 
       const bucket: Record<number, Express.Multer.File[]> = {};
