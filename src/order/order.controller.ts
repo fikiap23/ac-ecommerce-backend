@@ -15,13 +15,14 @@ import {
 } from '@nestjs/common';
 import { OrderService } from './services/order.service';
 import {
+  CompleteOrderProductsDto,
   CreateOrderDto,
   DeviceListFilterDto,
   OrderNetDto,
   QueryOrderDto,
   QueryReportSummaryDto,
   QueryReportTransactionStatsDto,
-  SetCompleteOrderDto,
+  UpdateOrderProductByUuidDto,
   UpdateOrderStatusDto,
 } from './dto/order.dto';
 import { Response } from 'express';
@@ -72,6 +73,7 @@ export class OrderController {
       errorHandler(res, error);
     }
   }
+
   @UseGuards(JwtGuard)
   @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN)
   @Patch('order/status')
@@ -84,21 +86,36 @@ export class OrderController {
     }
   }
 
+  @UseGuards(JwtGuard)
+  @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN)
+  @Patch('order/product')
+  async updateOrderProduct(
+    @Body() dto: UpdateOrderProductByUuidDto,
+    @Res() res: Response,
+  ) {
+    try {
+      await this.orderService.updateOrderProductByUuid(dto);
+      return formatResponse(res, HttpStatus.OK, null);
+    } catch (error) {
+      errorHandler(res, error);
+    }
+  }
+
   @UseGuards(JwtGuard, RoleGuard)
-  @Patch('order/complete')
+  @Patch('order/product/complete')
   @UseInterceptors(
     AnyFilesInterceptor({
       fileFilter: imageFileFilter,
-      limits: { fileSize: 5 * 1024 * 1024 },
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB per file
     }),
   )
-  async setComplete(
-    @Body() dto: SetCompleteOrderDto,
+  async setProductComplete(
+    @Body() dto: CompleteOrderProductsDto,
     @UploadedFiles() files: Express.Multer.File[],
     @Res() res: Response,
   ) {
     try {
-      // items[0][images] , items[0][images] (boleh berulang), items[1][images], dst.
+      // Expect: items[0][images], items[0][images] (repeatable), items[1][images], ...
       const imgRe = /^items\[(\d+)]\[images]$/;
 
       const bucket: Record<number, Express.Multer.File[]> = {};
@@ -110,10 +127,10 @@ export class OrderController {
         }
       }
 
-      // urutkan sesuai index items[] di DTO; item tanpa file -> []
+      // Urutkan supaya index file selaras dengan index items[]
       const filesByItem = (dto.items ?? []).map((_, i) => bucket[i] ?? []);
 
-      await this.orderService.setCompleteOrder(dto, filesByItem);
+      await this.orderService.completeOrderProducts(dto, filesByItem); // <-- ganti service
       return formatResponse(res, HttpStatus.OK, null);
     } catch (e) {
       return errorHandler(res, e);

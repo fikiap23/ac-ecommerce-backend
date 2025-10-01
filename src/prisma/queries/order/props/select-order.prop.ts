@@ -305,20 +305,7 @@ export const selectOrderByUuid: Prisma.OrderSelect = {
 
   // status & timing
   status: true,
-  scheduledAt: true,
   expiredAt: true,
-
-  // assignment
-  driverId: true,
-  driverName: true,
-  technicianId: true,
-  technicianName: true,
-
-  // NEW service-complete fields
-  task: true,
-
-  // notes
-  notes: true,
 
   // address
   orderAddress: { select: { address: true } },

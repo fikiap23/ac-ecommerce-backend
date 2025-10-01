@@ -425,18 +425,10 @@ model Order {
   customerId            Int?
   voucherId             Int?
   status                TypeStatusOrder @default(WAITING_PAYMENT)
-  notes                 String?
 
-  scheduledAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  expiredAt   DateTime?
-
-  driverId       Int?
-  driverName     String?
-  technicianId   Int?
-  technicianName String?
-  task           String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  expiredAt DateTime?
 
   orderAddressId     Int?
   recipientAddressId Int?
@@ -494,15 +486,20 @@ model OrderProduct {
 
   remarks String? @db.Text
 
-  technicianId   Int?
-  technicianName String?
+  driverId       Int?
+  driverName     String?
+  technicianId   Int[]    @default([])
+  technicianName String[] @default([])
   freonBefore    Float?
   freonAfter     Float?
   tempBefore     Float?
   tempAfter      Float?
   currentBefore  Float?
   currentAfter   Float?
-  images         OrderImage[]
+  notes          String?
+
+  scheduledAt DateTime?
+  images      OrderImage[]
 
   orderProductImage OrderProductImage[]
 

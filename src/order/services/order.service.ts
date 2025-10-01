@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import {
+  CompleteOrderProductsDto,
   CreateOrderDto,
   DeviceListFilterDto,
   OrderNetDto,
-  SetCompleteOrderDto,
+  UpdateOrderProductByUuidDto,
   UpdateOrderStatusDto,
 } from '../dto/order.dto';
 import { ProductRepository } from 'src/product/repositories/product.repository';
@@ -11,7 +12,6 @@ import { VoucherRepository } from 'src/voucher/repositories/voucher.repository';
 import { OrderRepository } from '../repositories/order.repository';
 import { CustomerRepository } from 'src/customer/repositories/customer.repository';
 import {
-  IDeviceListFilter,
   IFilterOrder,
   IFilterReportSummary,
   IFilterReportTransactionStats,
@@ -1144,22 +1144,158 @@ export class OrderService {
   }
 
   async updateOrderStatus(dto: UpdateOrderStatusDto) {
-    const {
-      orderUuid,
-      productOrders,
-      scheduleAt,
-      technicianUuid,
-      driverUuid,
-      ...rest
-    } = dto;
+    const { orderUuid, status } = dto;
 
-    // Validasi scheduleAt
-    const scheduleAtDate = scheduleAt ? new Date(scheduleAt) : undefined;
-    if (scheduleAt && isNaN(scheduleAtDate.getTime())) {
+    return this.prismaService.execTx(async (tx) => {
+      // pastikan order ada
+      await this.orderRepository.getThrowByUuid({
+        uuid: orderUuid,
+        select: { id: true },
+        tx,
+      });
+
+      await this.orderRepository.update({
+        where: { uuid: orderUuid },
+        data: { status },
+        tx,
+      });
+
+      return null;
+    });
+  }
+
+  async updateOrderProductByUuid(dto: UpdateOrderProductByUuidDto) {
+    const { orderUuid, items } = dto;
+
+    if (!items?.length) {
       throw new CustomError({
-        message: 'scheduleAt tidak valid (harus ISO string)',
+        message: 'items tidak boleh kosong',
         statusCode: 400,
       });
+    }
+
+    // Validasi semua scheduleAt lebih dulu agar error cepat
+    for (const it of items) {
+      if (it.scheduleAt) {
+        const d = new Date(it.scheduleAt);
+        if (isNaN(d.getTime())) {
+          throw new CustomError({
+            message: `scheduleAt tidak valid untuk orderProductUuid ${it.orderProductUuid} (harus ISO string)`,
+            statusCode: 400,
+          });
+        }
+      }
+    }
+
+    return this.prismaService.execTx(async (tx) => {
+      // Pastikan order ada & dapatkan id
+      const order = await this.orderRepository.getThrowByUuid({
+        uuid: orderUuid,
+        select: { id: true },
+        tx,
+      });
+
+      // Validasi kepemilikan orderProduct
+      const requestedUuids = items.map((i) => i.orderProductUuid);
+      const existing = await this.orderProductRepository.getMany({
+        where: { orderId: order.id, uuid: { in: requestedUuids } },
+        select: { id: true, uuid: true },
+        tx,
+      });
+
+      const validSet = new Set(existing.map((e) => e.uuid));
+      const invalid = requestedUuids.filter((u) => !validSet.has(u));
+      if (invalid.length) {
+        throw new CustomError({
+          message: `orderProductUuid tidak valid / bukan milik order: ${invalid.join(
+            ', ',
+          )}`,
+          statusCode: 400,
+        });
+      }
+
+      // Proses tiap item
+      for (const it of items) {
+        // Resolve driver (optional)
+        let driverId: number | undefined;
+        let driverName: string | undefined;
+        if (it.driverUuid) {
+          const drv = await this.driverRepository.getThrowByUuid({
+            uuid: it.driverUuid,
+            select: { id: true, name: true },
+            tx,
+          });
+          driverId = drv.id;
+          driverName = drv.name ?? null;
+        }
+
+        // Resolve technicians (optional, array)
+        let technicianIds: number[] | undefined;
+        let technicianNames: string[] | undefined;
+        if (it.technicianUuids?.length) {
+          technicianIds = [];
+          technicianNames = [];
+          for (const tu of it.technicianUuids) {
+            const tech = await this.technicianRepository.getThrowByUuid({
+              uuid: tu,
+              select: { id: true, name: true },
+              tx,
+            });
+            technicianIds.push(tech.id);
+            technicianNames.push(tech.name ?? null);
+          }
+        }
+
+        // Build payload untuk OrderProduct
+        const data: Prisma.OrderProductUpdateInput = {
+          deviceId: it.deviceId ?? undefined,
+          notes: it.notes ?? undefined,
+          scheduledAt: it.scheduleAt ? new Date(it.scheduleAt) : undefined,
+          ...(driverId !== undefined ? { driverId } : {}),
+          ...(driverName !== undefined ? { driverName } : {}),
+          ...(technicianIds !== undefined
+            ? { technicianId: technicianIds }
+            : {}),
+          ...(technicianNames !== undefined
+            ? { technicianName: technicianNames }
+            : {}),
+        };
+
+        await this.orderProductRepository.updateByUuid({
+          uuid: it.orderProductUuid,
+          data,
+          tx,
+        });
+      }
+
+      return null;
+    });
+  }
+
+  async completeOrderProducts(
+    dto: CompleteOrderProductsDto,
+    filesByItem: Express.Multer.File[][] = [],
+  ) {
+    const { orderUuid, items } = dto;
+
+    if (!items?.length) {
+      throw new CustomError({
+        message: 'items tidak boleh kosong',
+        statusCode: 400,
+      });
+    }
+
+    // Validasi ISO date dulu biar fail cepat
+    for (const it of items) {
+      if (it.scheduleAt) {
+        const d = new Date(it.scheduleAt);
+        if (isNaN(d.getTime())) {
+          throw new CustomError({
+            message: `scheduleAt harus ISO untuk item ${it.orderProductUuid}`,
+            statusCode: 400,
+          });
+        }
+      }
     }
 
     return this.prismaService.execTx(async (tx) => {
@@ -1170,159 +1306,45 @@ export class OrderService {
         tx,
       });
 
-      // Resolve technician by UUID -> id & name
-      let techId: number | undefined;
-      let techName: string | undefined;
-      if (technicianUuid) {
-        const tech = await this.technicianRepository.getThrowByUuid({
-          uuid: technicianUuid,
-          select: { id: true, name: true },
-          tx,
-        });
-        techId = tech.id;
-        techName = tech.name ?? null;
-      }
-
-      // Resolve driver by UUID -> id & name
-      let drvId: number | undefined;
-      let drvName: string | undefined;
-      if (driverUuid) {
-        const drv = await this.driverRepository.getThrowByUuid({
-          uuid: driverUuid,
-          select: { id: true, name: true },
-          tx,
-        });
-        drvId = drv.id;
-        drvName = drv.name ?? null;
-      }
-
-      // Bangun payload update sesuai kolom model Order
-      const data: Prisma.OrderUpdateInput = {
-        status: rest.status,
-        notes: rest.notes ?? undefined,
-        scheduledAt: scheduleAtDate ?? undefined,
-        ...(techId !== undefined ? { technicianId: techId } : {}),
-        ...(techName !== undefined ? { technicianName: techName } : {}),
-        ...(drvId !== undefined ? { driverId: drvId } : {}),
-        ...(drvName !== undefined ? { driverName: drvName } : {}),
-      };
-
-      // Update order
-      await this.orderRepository.update({
-        where: { uuid: orderUuid },
-        data,
+      // Validasi kepemilikan tiap orderProduct
+      const reqUuids = items.map((i) => i.orderProductUuid);
+      const exist = await this.orderProductRepository.getMany({
+        where: { orderId: order.id, uuid: { in: reqUuids } },
+        select: { uuid: true },
         tx,
       });
-
-      // Update productOrders.deviceId (validasi milik order yang sama)
-      if (productOrders?.length) {
-        const ids = productOrders.map((p) => p.orderProductUuid);
-        const found = await this.orderProductRepository.getMany({
-          where: { orderId: order.id, uuid: { in: ids } },
-          select: { uuid: true, deviceId: true },
-          tx,
-        });
-
-        const validSet = new Set(found.map((x) => x.uuid));
-        const invalid = productOrders.filter(
-          (p) => !validSet.has(p.orderProductUuid),
-        );
-        if (invalid.length > 0) {
-          throw new CustomError({
-            message: `orderProductUuid tidak valid: ${invalid
-              .map((i) => i.orderProductUuid)
-              .join(', ')}`,
-            statusCode: 400,
-          });
-        }
-
-        for (const p of productOrders) {
-          // device id must be unique
-          // if (found.some((f) => f.deviceId === p.deviceId)) {
-          //   throw new CustomError({
-          //     message: `deviceId ${p.deviceId} sudah digunakan`,
-          //     statusCode: 400,
-          //   });
-          // }
-          await this.orderProductRepository.updateByUuid({
-            uuid: p.orderProductUuid,
-            data: { deviceId: p.deviceId },
-            tx,
-          });
-        }
-      }
-
-      return null;
-    });
-  }
-
-  async setCompleteOrder(
-    dto: SetCompleteOrderDto,
-    filesByItem: Express.Multer.File[][] = [],
-  ) {
-    const { orderUuid, scheduleAt, status, notes, items = [] } = dto;
-
-    const scheduleAtDate = scheduleAt ? new Date(scheduleAt) : undefined;
-    if (scheduleAt && isNaN(scheduleAtDate.getTime())) {
-      throw new CustomError({
-        message: 'scheduleAt harus ISO',
-        statusCode: 400,
-      });
-    }
-
-    return this.prismaService.execTx(async (tx) => {
-      // pastikan order ada
-      const order = await this.orderRepository.getThrowByUuid({
-        uuid: orderUuid,
-        select: { id: true },
-        tx,
-      });
-
-      // update kolom milik Order
-      await this.orderRepository.update({
-        where: { uuid: orderUuid },
-        data: {
-          status: status ?? undefined,
-          notes: notes ?? undefined,
-          scheduledAt: scheduleAtDate ?? undefined,
-        },
-        tx,
-      });
-
-      if (!items.length) return null;
-
-      // validasi semua orderProduct milik order
-      const itemUuids = items.map((i) => i.orderProductUuid);
-      const existingItems = await this.orderProductRepository.getMany({
-        where: { orderId: order.id, uuid: { in: itemUuids } },
-        select: { id: true, uuid: true },
-        tx,
-      });
-      const ok = new Map(existingItems.map((x) => [x.uuid, x.id]));
-      const invalid = items.filter((i) => !ok.has(i.orderProductUuid));
+      const validSet = new Set(exist.map((x) => x.uuid));
+      const invalid = reqUuids.filter((u) => !validSet.has(u));
       if (invalid.length) {
         throw new CustomError({
-          message:
-            'orderProductUuid tidak valid: ' +
-            invalid.map((x) => x.orderProductUuid).join(', '),
+          message: `orderProductUuid tidak valid / bukan milik order: ${invalid.join(
+            ', ',
+          )}`,
           statusCode: 400,
         });
       }
 
-      // ambil semua technicianUuid unik (jika ada) lalu resolve -> id & name
-      const techUuids = Array.from(
-        new Set(items.map((i) => i.technicianUuid).filter(Boolean) as string[]),
+      // Bulk resolve teknisi & driver
+      const techUniques = Array.from(
+        new Set(
+          items
+            .flatMap((i) => i.technicianUuids ?? [])
+            .filter(Boolean) as string[],
+        ),
+      );
+      const drvUniques = Array.from(
+        new Set(items.map((i) => i.driverUuid).filter(Boolean) as string[]),
       );
 
       let techMap = new Map<string, { id: number; name: string | null }>();
-      if (techUuids.length) {
+      if (techUniques.length) {
         const techs = await this.technicianRepository.getMany({
-          where: { uuid: { in: techUuids } },
+          where: { uuid: { in: techUniques } },
           select: { uuid: true, id: true, name: true },
           tx,
         });
         const found = new Set(techs.map((t) => t.uuid));
-        const missing = techUuids.filter((u) => !found.has(u));
+        const missing = techUniques.filter((u) => !found.has(u));
         if (missing.length) {
           throw new CustomError({
             message: `technicianUuid tidak valid: ${missing.join(', ')}`,
@@ -1334,18 +1356,34 @@ export class OrderService {
         );
       }
 
-      // proses tiap OrderProduct
+      let drvMap = new Map<string, { id: number; name: string | null }>();
+      if (drvUniques.length) {
+        const drvs = await this.driverRepository.getMany({
+          where: { uuid: { in: drvUniques } },
+          select: { uuid: true, id: true, name: true },
+          tx,
+        });
+        const found = new Set(drvs.map((d) => d.uuid));
+        const missing = drvUniques.filter((u) => !found.has(u));
+        if (missing.length) {
+          throw new CustomError({
+            message: `driverUuid tidak valid: ${missing.join(', ')}`,
+            statusCode: 400,
+          });
+        }
+        drvMap = new Map(drvs.map((d) => [d.uuid, { id: d.id, name: d.name }]));
+      }
+
+      // Proses per item
       for (let i = 0; i < items.length; i++) {
         const it = items[i];
-        const orderProductId = ok.get(it.orderProductUuid)!;
 
-        // simpan images untuk item i
+        // Images: simpan file jadi URL; index 0 = main
         const files = filesByItem[i] ?? [];
         const urls: string[] = [];
         for (const f of files) {
-          urls.push(await this.saveLocalImage(f)); // index 0 = main
+          urls.push(await this.saveLocalImage(f)); // implementasi sudah ada di kode lama
         }
-
         const imagesNested =
           urls.length || it.replaceImages
             ? {
@@ -1361,32 +1399,53 @@ export class OrderService {
               }
             : undefined;
 
-        // siapkan payload teknisi (per item)
-        let technicianId: number | undefined;
-        let technicianName: string | null | undefined;
-        if (it.technicianUuid) {
-          const t = techMap.get(it.technicianUuid);
-          technicianId = t?.id;
-          technicianName = t?.name ?? null;
+        // Driver (opsional)
+        let driverId: number | undefined;
+        let driverName: string | null | undefined;
+        if (it.driverUuid) {
+          const d = drvMap.get(it.driverUuid);
+          driverId = d?.id;
+          driverName = d?.name ?? null;
         }
+
+        // Teknisi (opsional; array)
+        let technicianIds: number[] | undefined;
+        let technicianNames: (string | null)[] | undefined;
+        if (it.technicianUuids?.length) {
+          technicianIds = [];
+          technicianNames = [];
+          for (const tu of it.technicianUuids) {
+            const t = techMap.get(tu)!; // sudah tervalidasi
+            technicianIds.push(t.id);
+            technicianNames.push(t.name ?? null);
+          }
+        }
+
+        const data: Prisma.OrderProductUpdateInput = {
+          deviceId: it.deviceId ?? undefined,
+          notes: it.notes ?? undefined,
+          scheduledAt: it.scheduleAt ? new Date(it.scheduleAt) : undefined,
+          remarks: it.remarks ?? undefined,
+          freonBefore: it.freonBefore ?? undefined,
+          freonAfter: it.freonAfter ?? undefined,
+          tempBefore: it.tempBefore ?? undefined,
+          tempAfter: it.tempAfter ?? undefined,
+          currentBefore: it.currentBefore ?? undefined,
+          currentAfter: it.currentAfter ?? undefined,
+          images: imagesNested,
+          ...(driverId !== undefined ? { driverId } : {}),
+          ...(driverName !== undefined ? { driverName } : {}),
+          ...(technicianIds !== undefined
+            ? { technicianId: technicianIds }
+            : {}),
+          ...(technicianNames !== undefined
+            ? { technicianName: technicianNames as string[] }
+            : {}),
+        };
 
         await this.orderProductRepository.updateByUuid({
           uuid: it.orderProductUuid,
-          data: {
-            deviceId: it.deviceId ?? undefined,
-            remarks: it.remarks ?? undefined,
-            freonBefore: it.freonBefore ?? undefined,
-            freonAfter: it.freonAfter ?? undefined,
-            tempBefore: it.tempBefore ?? undefined,
-            tempAfter: it.tempAfter ?? undefined,
-            currentBefore: it.currentBefore ?? undefined,
-            currentAfter: it.currentAfter ?? undefined,
-            images: imagesNested,
-
-            technicianId: technicianId !== undefined ? technicianId : undefined,
-            technicianName:
-              technicianName !== undefined ? technicianName : undefined,
-          },
+          data,
           tx,
         });
       }

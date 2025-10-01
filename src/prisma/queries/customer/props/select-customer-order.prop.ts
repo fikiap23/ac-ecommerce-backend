@@ -10,8 +10,6 @@ export const SelectGeneralCustomerOrder: Prisma.OrderSelect = {
   trackId: true,
   createdAt: true,
   status: true,
-  driverName: true,
-  technicianName: true,
   orderAddress: {
     select: {
       address: true,

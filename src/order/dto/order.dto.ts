@@ -1,6 +1,7 @@
 import {
   IsArray,
   IsBoolean,
+  IsDateString,
   IsEmail,
   IsEnum,
   IsNotEmpty,
@@ -160,43 +161,50 @@ export class OrderNetDto {
   endDate?: string;
 }
 
-export class UpdateProductOrderDeviceDto {
-  @IsString()
-  orderProductUuid: string;
-
-  @IsString()
-  deviceId: string;
-}
-
 export class UpdateOrderStatusDto {
   @IsString()
   @IsNotEmpty()
   orderUuid: string;
 
-  @IsOptional()
   @IsEnum(TypeStatusOrder)
-  status?: TypeStatusOrder;
+  status: TypeStatusOrder;
+}
+
+export class UpdateOrderProductItemDto {
+  @IsString()
+  @IsNotEmpty()
+  orderProductUuid: string;
 
   @IsOptional()
   @IsString()
-  technicianUuid?: string;
-
-  @IsOptional()
-  @IsString()
-  driverUuid?: string;
+  deviceId?: string;
 
   @IsOptional()
   @IsString()
   notes?: string;
 
   @IsOptional()
-  @IsString()
+  @IsDateString()
   scheduleAt?: string;
 
   @IsOptional()
+  @IsString()
+  driverUuid?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  technicianUuids?: string[];
+}
+
+export class UpdateOrderProductByUuidDto {
+  @IsString()
+  @IsNotEmpty()
+  orderUuid: string;
+
   @ValidateNested({ each: true })
-  @Type(() => UpdateProductOrderDeviceDto)
-  productOrders?: UpdateProductOrderDeviceDto[];
+  @Type(() => UpdateOrderProductItemDto)
+  items: UpdateOrderProductItemDto[];
 }
 
 export class DeviceListFilterDto extends SearchPaginationDto {
@@ -235,7 +243,16 @@ export class QueryReportRecentTransactionDto extends SearchPaginationDto {
   endDate?: string;
 }
 
-export class SetCompleteOrderItemDto {
+export class SetOrderStatusDto {
+  @IsString()
+  @IsNotEmpty()
+  orderUuid: string;
+
+  @IsEnum(TypeStatusOrder)
+  status: TypeStatusOrder;
+}
+
+export class CompleteOrderItemDto {
   @IsString()
   @IsNotEmpty()
   orderProductUuid: string;
@@ -246,43 +263,42 @@ export class SetCompleteOrderItemDto {
 
   @IsOptional()
   @IsString()
-  remarks?: string;
-
-  @IsOptional() @IsNumber() freonBefore?: number;
-  @IsOptional() @IsNumber() freonAfter?: number;
-  @IsOptional() @IsNumber() tempBefore?: number;
-  @IsOptional() @IsNumber() tempAfter?: number;
-  @IsOptional() @IsNumber() currentBefore?: number;
-  @IsOptional() @IsNumber() currentAfter?: number;
+  notes?: string;
 
   @IsOptional()
-  @IsBoolean()
-  replaceImages?: boolean;
+  @IsDateString()
+  scheduleAt?: string; // ISO 8601
 
+  // readings / misc
+  @IsOptional() freonBefore?: number;
+  @IsOptional() freonAfter?: number;
+  @IsOptional() tempBefore?: number;
+  @IsOptional() tempAfter?: number;
+  @IsOptional() currentBefore?: number;
+  @IsOptional() currentAfter?: number;
+  @IsOptional() @IsString() remarks?: string;
+
+  // relasi personel per item
   @IsOptional()
   @IsString()
-  technicianUuid?: string;
+  driverUuid?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  technicianUuids?: string[];
+
+  // gambar
+  @IsOptional()
+  replaceImages?: boolean; // true = hapus semua lalu buat ulang
 }
 
-export class SetCompleteOrderDto {
+export class CompleteOrderProductsDto {
   @IsString()
   @IsNotEmpty()
   orderUuid: string;
 
-  @IsOptional()
-  status?: TypeStatusOrder;
-
-  @IsOptional()
-  @IsString()
-  notes?: string;
-
-  @IsOptional()
-  @IsString()
-  scheduleAt?: string;
-
-  @IsOptional()
-  @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => SetCompleteOrderItemDto)
-  items?: SetCompleteOrderItemDto[];
+  @Type(() => CompleteOrderItemDto)
+  items: CompleteOrderItemDto[];
 }
