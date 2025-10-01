@@ -47,6 +47,9 @@ export const selectGeneralOrder: Prisma.OrderSelect = {
   expiredAt: true,
   orderAddress: true,
   discountBundle: true,
+  scheduledAt: true,
+  spk: true,
+  notes: true,
   orderProduct: {
     select: {
       id: true,
@@ -97,6 +100,9 @@ export const selectGeneralListOrders: Prisma.OrderSelect = {
   trackId: true,
   name: true,
   discountBundle: true,
+  scheduledAt: true,
+  spk: true,
+  notes: true,
   orderAddress: {
     select: {
       address: true,
@@ -152,6 +158,9 @@ export const selectGeneralTrackOrder: Prisma.OrderSelect = {
   createdAt: true,
   status: true,
   discountBundle: true,
+  scheduledAt: true,
+  spk: true,
+  notes: true,
   orderProduct: {
     select: {
       id: true,
@@ -306,6 +315,9 @@ export const selectOrderByUuid: Prisma.OrderSelect = {
   // status & timing
   status: true,
   expiredAt: true,
+  scheduledAt: true,
+  notes: true,
+  spk: true,
 
   // address
   orderAddress: { select: { address: true } },
@@ -344,7 +356,6 @@ export const selectOrderByUuid: Prisma.OrderSelect = {
       currentAfter: true,
       driverId: true,
       driverName: true,
-      scheduledAt: true,
       technicianId: true,
       technicianName: true,
       images: {
@@ -438,8 +449,6 @@ export const selectOrderProductDevice: Prisma.OrderProductSelect = {
   minusPrice: true,
   driverId: true,
   driverName: true,
-  notes: true,
-  scheduledAt: true,
   technicianId: true,
   technicianName: true,
   images: true,

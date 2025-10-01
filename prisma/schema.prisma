@@ -425,10 +425,13 @@ model Order {
   customerId            Int?
   voucherId             Int?
   status                TypeStatusOrder @default(WAITING_PAYMENT)
+  notes                 String?
+  spk                   String?
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  expiredAt DateTime?
+  scheduledAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  expiredAt   DateTime?
 
   orderAddressId     Int?
   recipientAddressId Int?
@@ -496,10 +499,8 @@ model OrderProduct {
   tempAfter      Float?
   currentBefore  Float?
   currentAfter   Float?
-  notes          String?
 
-  scheduledAt DateTime?
-  images      OrderImage[]
+  images OrderImage[]
 
   orderProductImage OrderProductImage[]
 

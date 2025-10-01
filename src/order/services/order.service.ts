@@ -1144,7 +1144,17 @@ export class OrderService {
   }
 
   async updateOrderStatus(dto: UpdateOrderStatusDto) {
-    const { orderUuid, status } = dto;
+    const { orderUuid, status, notes, scheduledAt, spk } = dto;
+
+    if (scheduledAt) {
+      var d = new Date(scheduledAt);
+      if (isNaN(d.getTime())) {
+        throw new CustomError({
+          message: 'scheduledAt tidak valid',
+          statusCode: 400,
+        });
+      }
+    }
 
     return this.prismaService.execTx(async (tx) => {
       // pastikan order ada
@@ -1156,7 +1166,12 @@ export class OrderService {
 
       await this.orderRepository.update({
         where: { uuid: orderUuid },
-        data: { status },
+        data: {
+          status,
+          notes,
+          spk,
+          scheduledAt: d,
+        },
         tx,
       });
 
@@ -1172,19 +1187,6 @@ export class OrderService {
         message: 'items tidak boleh kosong',
         statusCode: 400,
       });
-    }
-
-    // Validasi semua scheduleAt lebih dulu agar error cepat
-    for (const it of items) {
-      if (it.scheduleAt) {
-        const d = new Date(it.scheduleAt);
-        if (isNaN(d.getTime())) {
-          throw new CustomError({
-            message: `scheduleAt tidak valid untuk orderProductUuid ${it.orderProductUuid} (harus ISO string)`,
-            statusCode: 400,
-          });
-        }
-      }
     }
 
     return this.prismaService.execTx(async (tx) => {
@@ -1249,8 +1251,6 @@ export class OrderService {
         // Build payload untuk OrderProduct
         const data: Prisma.OrderProductUpdateInput = {
           deviceId: it.deviceId ?? undefined,
-          notes: it.notes ?? undefined,
-          scheduledAt: it.scheduleAt ? new Date(it.scheduleAt) : undefined,
           ...(driverId !== undefined ? { driverId } : {}),
           ...(driverName !== undefined ? { driverName } : {}),
           ...(technicianIds !== undefined
@@ -1283,19 +1283,6 @@ export class OrderService {
         message: 'items tidak boleh kosong',
         statusCode: 400,
       });
-    }
-
-    // Validasi ISO date dulu biar fail cepat
-    for (const it of items) {
-      if (it.scheduleAt) {
-        const d = new Date(it.scheduleAt);
-        if (isNaN(d.getTime())) {
-          throw new CustomError({
-            message: `scheduleAt harus ISO untuk item ${it.orderProductUuid}`,
-            statusCode: 400,
-          });
-        }
-      }
     }
 
     return this.prismaService.execTx(async (tx) => {
@@ -1423,8 +1410,6 @@ export class OrderService {
 
         const data: Prisma.OrderProductUpdateInput = {
           deviceId: it.deviceId ?? undefined,
-          notes: it.notes ?? undefined,
-          scheduledAt: it.scheduleAt ? new Date(it.scheduleAt) : undefined,
           remarks: it.remarks ?? undefined,
           freonBefore: it.freonBefore ?? undefined,
           freonAfter: it.freonAfter ?? undefined,

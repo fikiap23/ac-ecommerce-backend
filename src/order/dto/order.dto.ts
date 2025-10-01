@@ -168,6 +168,18 @@ export class UpdateOrderStatusDto {
 
   @IsEnum(TypeStatusOrder)
   status: TypeStatusOrder;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsDateString()
+  scheduledAt?: string;
+
+  @IsOptional()
+  @IsString()
+  spk?: string;
 }
 
 export class UpdateOrderProductItemDto {
@@ -178,14 +190,6 @@ export class UpdateOrderProductItemDto {
   @IsOptional()
   @IsString()
   deviceId?: string;
-
-  @IsOptional()
-  @IsString()
-  notes?: string;
-
-  @IsOptional()
-  @IsDateString()
-  scheduleAt?: string;
 
   @IsOptional()
   @IsString()
@@ -260,14 +264,6 @@ export class CompleteOrderItemDto {
   @IsOptional()
   @IsString()
   deviceId?: string;
-
-  @IsOptional()
-  @IsString()
-  notes?: string;
-
-  @IsOptional()
-  @IsDateString()
-  scheduleAt?: string; // ISO 8601
 
   // readings / misc
   @IsOptional() freonBefore?: number;
