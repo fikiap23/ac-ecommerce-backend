@@ -7,4 +7,7 @@ export const SelectGeneralCustomerProfile: Prisma.CustomerSelect = {
   name: true,
   email: true,
   phoneNumber: true,
+
+  createdAt: true,
+  updatedAt: true,
 };

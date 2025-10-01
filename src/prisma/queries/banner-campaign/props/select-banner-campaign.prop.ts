@@ -5,6 +5,7 @@ export const selectGeneralBannerCampaign: Prisma.BannerCampaignSelect = {
   title: true,
   image: true,
   type: true,
+  link: true,
   createdAt: true,
   updatedAt: true,
 };

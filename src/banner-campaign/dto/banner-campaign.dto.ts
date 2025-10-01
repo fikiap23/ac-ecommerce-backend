@@ -17,6 +17,10 @@ export class CreateBannerCampaignDto {
   @IsEnum(TypeBanner)
   @IsNotEmpty()
   type: TypeBanner;
+
+  @IsOptional()
+  @IsString()
+  link?: string;
 }
 
 export class UpdateBannerCampaignDto extends PartialType(
