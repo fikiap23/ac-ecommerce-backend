@@ -1467,15 +1467,17 @@ export class OrderService {
   }
 
   async getManyDeviceById(sub: string, deviceId: string) {
-    const customer = await this.customerRepository.getThrowByUuid({
-      uuid: sub,
-    });
+    let customer = null;
+
+    if (sub) {
+      customer = await this.customerRepository.getThrowByUuid({
+        uuid: sub,
+      });
+    }
     return this.orderProductRepository.getManyDevice({
       where: {
         deviceId,
-        order: {
-          customerId: customer.id,
-        },
+        ...(customer && { customerId: customer.id }),
       },
       select: selectOrderProductDevice,
     });
