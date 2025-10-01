@@ -251,6 +251,23 @@ export class OrderController {
     }
   }
 
+  @UseGuards(JwtGuard, RoleGuard)
+  @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN)
+  @Get('device/paginate/:uuid')
+  async getDevicePaginateByUser(
+    @Query() query: DeviceListFilterDto,
+    @Param('uuid') uuid: string,
+    @Res() res: Response,
+  ) {
+    try {
+      const result = await this.orderService.getManyDevicePaginate(uuid, query);
+
+      return formatResponse(res, HttpStatus.OK, result.data, result.meta);
+    } catch (error) {
+      return errorHandler(res, error);
+    }
+  }
+
   @UseGuards(JwtGuard)
   @Get('device/:id')
   async getDeviceById(
