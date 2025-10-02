@@ -218,4 +218,21 @@ export class ProductQuery extends PrismaService {
       select,
     });
   }
+
+  async updateBundleByUuid({
+    tx,
+    uuid,
+    data,
+  }: {
+    tx?: Prisma.TransactionClient;
+    uuid: string;
+    data: Prisma.BundleUpdateInput;
+  }) {
+    const prisma = tx ?? this;
+
+    return await prisma.bundle.update({
+      where: { uuid, deletedAt: null },
+      data,
+    });
+  }
 }

@@ -301,8 +301,6 @@ export class ProductService {
       },
     });
 
-    console.log('rating', dto.rating);
-
     const existingBundle = !existingProduct
       ? await this.prisma.bundle.findUnique({
           where: { uuid },
@@ -680,13 +678,31 @@ export class ProductService {
   }
 
   async deleteByUuid(uuid: string) {
-    await this.productRepository.getThrowByUuid({ uuid });
+    const product = await this.productRepository.getByUuid({ uuid });
 
-    return await this.productRepository.updateByUuid({
-      uuid,
-      data: {
-        deletedAt: new Date(),
-      },
+    if (product) {
+      return await this.productRepository.updateByUuid({
+        uuid,
+        data: {
+          deletedAt: new Date(),
+        },
+      });
+    }
+
+    const bundle = await this.productRepository.getBundleByUuid({ uuid });
+
+    if (bundle) {
+      return await this.productRepository.updateBundleByUuid({
+        uuid,
+        data: {
+          deletedAt: new Date(),
+        },
+      });
+    }
+
+    throw new CustomError({
+      message: 'Produk/bundle tidak ditemukan',
+      statusCode: 404,
     });
   }
 

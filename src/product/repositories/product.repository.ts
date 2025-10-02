@@ -148,6 +148,38 @@ export class ProductRepository {
     return result;
   }
 
+  async getByUuid({
+    tx,
+    uuid,
+    select,
+  }: {
+    tx?: Prisma.TransactionClient;
+    uuid: string;
+    select?: Prisma.ProductSelect;
+  }) {
+    return await this.productQuery.findByUuid({
+      tx,
+      uuid,
+      select,
+    });
+  }
+
+  async getBundleByUuid({
+    tx,
+    uuid,
+    select,
+  }: {
+    tx?: Prisma.TransactionClient;
+    uuid: string;
+    select?: Prisma.ProductSelect;
+  }) {
+    return await this.productQuery.findBundleByUuid({
+      tx,
+      uuid,
+      select,
+    });
+  }
+
   async getThrowBundleByUuid({
     tx,
     uuid,
@@ -216,6 +248,22 @@ export class ProductRepository {
     data: IUpdateProduct;
   }) {
     return await this.productQuery.updateByUuid({
+      tx,
+      uuid,
+      data,
+    });
+  }
+
+  async updateBundleByUuid({
+    tx,
+    uuid,
+    data,
+  }: {
+    tx?: Prisma.TransactionClient;
+    uuid: string;
+    data: Prisma.BundleUpdateInput;
+  }) {
+    return await this.productQuery.updateBundleByUuid({
       tx,
       uuid,
       data,
