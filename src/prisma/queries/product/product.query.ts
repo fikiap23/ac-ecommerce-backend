@@ -109,6 +109,7 @@ export class ProductQuery extends PrismaService {
           createdAt: true,
           bundleImage: { select: { url: true } },
           index: true,
+          countTotalSale: true,
           items: {
             select: {
               product: {
@@ -118,6 +119,7 @@ export class ProductQuery extends PrismaService {
                   price: true,
                   productImage: { select: { url: true } },
                   productVariant: true,
+                  countTotalSale: true,
                 },
               },
             },
