@@ -235,7 +235,7 @@ model Product {
   price          Int
   salePrice      Int?
   rating         Float?
-  countTotalSale Int?
+  countTotalSale Int?               @default(0)
   index          Int?               @default(0)
   isHide         Boolean            @default(false)
   isActive       Boolean            @default(true)
@@ -297,7 +297,7 @@ model Bundle {
   price          Int
   salePrice      Int?
   rating         Float?
-  countTotalSale Int?
+  countTotalSale Int?      @default(0)
   index          Int?      @default(0)
   isHide         Boolean   @default(false)
   isActive       Boolean   @default(true)

@@ -17,6 +17,7 @@ export const selectGeneralProduct: Prisma.ProductSelect = {
   isHide: true,
   rating: true,
   index: true,
+  countTotalSale: true,
   createdAt: true,
 
   categoryProduct: {
@@ -47,6 +48,7 @@ export const selectGenerealBundle: Prisma.BundleSelect = {
   salePrice: true,
   rating: true,
   index: true,
+  countTotalSale: true,
   createdAt: true,
   updatedAt: true,
   deletedAt: true,
@@ -88,9 +90,11 @@ export const selectProductForCreateOrder: Prisma.ProductSelect = {
   capacity: true,
   type: true,
   index: true,
+  countTotalSale: true,
 };
 
 export const selectProductForCreateCustomerProduct: Prisma.ProductSelect = {
   id: true,
   serviceType: true,
+  countTotalSale: true,
 };

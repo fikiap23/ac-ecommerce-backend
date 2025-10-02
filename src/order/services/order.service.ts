@@ -579,6 +579,40 @@ export class OrderService {
         });
       }
 
+      for (const item of cart as any[]) {
+        const qty = item.quantity ?? 1;
+
+        // kalau ada bundle
+        if (item.bundle) {
+          await tx.bundle.update({
+            where: { uuid: item.bundle.uuid },
+            data: { countTotalSale: { increment: qty } },
+          });
+
+          // update semua product dalam bundle
+          for (const pb of item.customerProductBundle ?? []) {
+            const product = pb.product ?? pb.productVariant?.product;
+            if (product?.uuid) {
+              await tx.product.update({
+                where: { uuid: product.uuid },
+                data: { countTotalSale: { increment: qty } },
+              });
+            }
+          }
+
+          continue;
+        }
+
+        // kalau cuma product biasa
+        const product = item.productVariant?.product ?? item.product;
+        if (product?.uuid) {
+          await tx.product.update({
+            where: { uuid: product.uuid },
+            data: { countTotalSale: { increment: qty } },
+          });
+        }
+      }
+
       await tx.customerProduct.deleteMany({
         where: { uuid: { in: dto.carts.map((c) => c.cartUuid) } },
       });
@@ -588,7 +622,7 @@ export class OrderService {
 
     // === Email invoice: ikut DTO CARTS juga ===
     await this.mailService.sendInvoice({
-      subject: '[NEO] Menunggu Pembayaran - Pesanan Anda',
+      subject: '[G-Solusi] Menunggu Pembayaran - Pesanan Anda',
       title: 'Selesaikan Pesanan Anda',
       description:
         'Baru saja membuat pesanan? 📝 Klik Selesaikan Pesanan, masukkan ID Pesanan Anda, lalu ikuti langkah-langkah untuk melakukan pembayaran dan konfirmasi! 💳🛒',
