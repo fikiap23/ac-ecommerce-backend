@@ -75,6 +75,33 @@ export class ProductService {
       categoryProductConnect = { connect: { uuid: dto.categoryProductUuid } };
     }
 
+    const variantCapacityUuids = (variants ?? [])
+      .map((v) => v.capacityUuid)
+      .filter(Boolean) as string[];
+
+    let variantCapacityMap: Map<string, { uuid: string }> | undefined =
+      undefined;
+
+    if (variantCapacityUuids.length > 0) {
+      const foundCaps = await this.prisma.capacity.findMany({
+        where: { uuid: { in: variantCapacityUuids } },
+        select: { uuid: true },
+      });
+
+      // pastikan semua uuid yang dikirim valid
+      if (foundCaps.length !== new Set(variantCapacityUuids).size) {
+        throw new CustomError({
+          message: 'Variant capacityUuid tidak valid',
+          statusCode: 400,
+        });
+      }
+
+      // buat map cepat (kalau nanti perlu)
+      variantCapacityMap = new Map(
+        foundCaps.map((c) => [c.uuid, { uuid: c.uuid }]),
+      );
+    }
+
     // ============ FILE HANDLING RAPIH ============
     // kumpulkan path untuk rollback jika DB gagal
     const allAbsToCleanup: string[] = [];
@@ -188,6 +215,11 @@ export class ProductService {
                           salePrice: v.salePrice ?? null,
                           specification: v.specification ?? null,
                           photoUrl: variantPhotoUrls?.[idx] || null,
+                          ...(v.capacityUuid
+                            ? {
+                                capacity: { connect: { uuid: v.capacityUuid } },
+                              }
+                            : {}),
                         })),
                       }
                     : undefined,
@@ -348,6 +380,32 @@ export class ProductService {
       categoryProductConnect = { connect: { uuid: dto.categoryProductUuid } };
     }
 
+    const variantCapacityUuids = (dto.variants ?? [])
+      .map((v) => v.capacityUuid)
+      .filter((u) => typeof u === 'string' && u.length > 0) as string[];
+
+    let variantCapacityMap: Map<string, { uuid: string }> | undefined =
+      undefined;
+
+    if (variantCapacityUuids.length > 0) {
+      const foundCaps = await this.prisma.capacity.findMany({
+        where: { uuid: { in: variantCapacityUuids } },
+        select: { uuid: true },
+      });
+
+      // Pastikan semua capacityUuid yang dikirim valid
+      if (foundCaps.length !== new Set(variantCapacityUuids).size) {
+        throw new CustomError({
+          message: 'Salah satu variant.capacityUuid tidak valid',
+          statusCode: 400,
+        });
+      }
+
+      variantCapacityMap = new Map(
+        foundCaps.map((c) => [c.uuid, { uuid: c.uuid }]),
+      );
+    }
+
     // ===== FILE HANDLING =====
     const allAbsToCleanup: string[] = [];
 
@@ -468,7 +526,7 @@ export class ProductService {
           existingByUuid.set(pv.uuid, pv),
         );
 
-        // Siapkan rencana per varian
+        // Siapkan rencana per varian (dengan handling capacity)
         for (let i = 0; i < dto.variants.length; i++) {
           const v = dto.variants[i];
 
@@ -485,35 +543,57 @@ export class ProductService {
             newPhotoUrl = saved[0]?.url ?? null;
           }
 
+          const capacityField: any = (() => {
+            if (!Object.prototype.hasOwnProperty.call(v, 'capacityUuid'))
+              return undefined;
+            if (v.capacityUuid === null) return { disconnect: true };
+            if (
+              typeof v.capacityUuid === 'string' &&
+              v.capacityUuid.length > 0
+            ) {
+              // (validasi sudah dilakukan di atas)
+              return { connect: { uuid: v.capacityUuid } };
+            }
+            return undefined;
+          })();
+
           if (v.uuid && existingByUuid.has(v.uuid)) {
             const current = existingByUuid.get(v.uuid)!;
+            const updateData: any = {
+              name: v.name ?? undefined,
+              code: v.code ?? undefined,
+              stock: v.stock ?? undefined,
+              regularPrice: v.regularPrice ?? undefined,
+              salePrice: v.salePrice ?? undefined,
+              specification: v.specification ?? undefined,
+              photoUrl: newPhotoUrl ?? undefined,
+              ...(capacityField ? { capacity: capacityField } : {}),
+            };
+
             variantPlans.push({
               kind: 'update',
               uuid: v.uuid,
-              data: {
-                name: v.name ?? undefined,
-                code: v.code ?? undefined,
-                stock: v.stock ?? undefined,
-                regularPrice: v.regularPrice ?? undefined,
-                salePrice: v.salePrice ?? undefined,
-                specification: v.specification ?? undefined,
-                photoUrl: newPhotoUrl ?? undefined, // set hanya jika ada foto baru
-              },
+              data: updateData,
               oldPhotoAbs: newPhotoUrl ? urlToAbs(current.photoUrl) : null,
             });
           } else {
-            // create varian baru
+            // create varian baru (sertakan capacity jika ada)
+            const createData: any = {
+              name: v.name!,
+              code: v.code!,
+              stock: v.stock!,
+              regularPrice: v.regularPrice!,
+              salePrice: v.salePrice ?? null,
+              specification: v.specification ?? null,
+              photoUrl: newPhotoUrl ?? null,
+              ...(v.capacityUuid
+                ? { capacity: { connect: { uuid: v.capacityUuid } } }
+                : {}),
+            };
+
             variantPlans.push({
               kind: 'create',
-              data: {
-                name: v.name!,
-                code: v.code!,
-                stock: v.stock!,
-                regularPrice: v.regularPrice!,
-                salePrice: v.salePrice ?? null,
-                specification: v.specification ?? null,
-                photoUrl: newPhotoUrl ?? null,
-              },
+              data: createData,
             });
           }
         }

@@ -44,6 +44,10 @@ export class CreateProductVariantDto {
   @IsString()
   specification?: string;
 
+  @IsString()
+  @IsOptional()
+  capacityUuid?: string;
+
   image?: Express.Multer.File[];
 }
 

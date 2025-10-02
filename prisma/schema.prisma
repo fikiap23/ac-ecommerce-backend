@@ -280,12 +280,13 @@ model Model {
 }
 
 model Capacity {
-  id        Int       @id @default(autoincrement())
-  uuid      String    @unique @default(uuid())
-  name      String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  product   Product[]
+  id             Int              @id @default(autoincrement())
+  uuid           String           @unique @default(uuid())
+  name           String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  product        Product[]
+  productVariant ProductVariant[]
 }
 
 model Bundle {
@@ -346,6 +347,9 @@ model ProductVariant {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  capacityId Int?
+  capacity   Capacity? @relation(fields: [capacityId], references: [id], onDelete: Cascade)
 
   product               Product                 @relation(fields: [productId], references: [id], onDelete: Cascade)
   customerProduct       CustomerProduct[]

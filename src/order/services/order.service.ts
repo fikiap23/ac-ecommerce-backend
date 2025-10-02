@@ -134,6 +134,7 @@ export class OrderService {
             photoUrl: true,
             name: true,
             code: true,
+            capacity: true,
             product: { select: { uuid: true } },
           },
         },
@@ -484,7 +485,7 @@ export class OrderService {
 
               const typeName = p.type?.name ?? null;
               const modelName = p.model?.name ?? null;
-              const capacityName = p.capacity?.name ?? null;
+              const capacityName = variant?.capacity?.name ?? p.capacity?.name;
               const categoryName = p.categoryProduct?.name ?? null;
 
               return {

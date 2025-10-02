@@ -33,7 +33,11 @@ export const selectGeneralProduct: Prisma.ProductSelect = {
     },
   },
 
-  productVariant: true,
+  productVariant: {
+    include: {
+      capacity: true,
+    },
+  },
 };
 
 export const selectGenerealBundle: Prisma.BundleSelect = {
@@ -85,7 +89,11 @@ export const selectProductForCreateOrder: Prisma.ProductSelect = {
   categoryProduct: true,
   productImage: true,
   productVoucer: true,
-  productVariant: true,
+  productVariant: {
+    include: {
+      capacity: true,
+    },
+  },
   model: true,
   capacity: true,
   type: true,
