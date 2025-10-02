@@ -19,6 +19,7 @@ export const selectCustomerProduct: Prisma.CustomerProductSelect = {
           id: true,
           uuid: true,
           name: true,
+          capacity: true,
         },
       },
     },
