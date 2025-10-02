@@ -286,7 +286,9 @@ export class CompleteOrderItemDto {
 
   // gambar
   @IsOptional()
-  replaceImages?: boolean; // true = hapus semua lalu buat ulang
+  @IsArray()
+  @IsString({ each: true })
+  replaceImages?: string[];
 }
 
 export class CompleteOrderProductsDto {

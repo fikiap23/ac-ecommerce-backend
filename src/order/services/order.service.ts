@@ -1406,9 +1406,11 @@ export class OrderService {
           urls.push(await this.saveLocalImage(f)); // implementasi sudah ada di kode lama
         }
         const imagesNested =
-          urls.length || it.replaceImages
+          urls.length || (it.replaceImages?.length ?? 0) > 0
             ? {
-                ...(it.replaceImages ? { deleteMany: {} } : {}),
+                ...(it.replaceImages?.length
+                  ? { deleteMany: { uuid: { in: it.replaceImages } } }
+                  : {}),
                 ...(urls.length
                   ? {
                       create: urls.map((url, idx) => ({
