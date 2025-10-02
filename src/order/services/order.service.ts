@@ -1462,7 +1462,7 @@ export class OrderService {
     return this.orderProductRepository.getManyDevice({
       where: {
         deviceId,
-        ...(customer && { customerId: customer.id }),
+        ...(customer && { order: { customerId: customer.id } }),
       },
       select: selectOrderProductDevice,
     });
