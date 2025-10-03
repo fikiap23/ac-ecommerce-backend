@@ -927,7 +927,7 @@ export class OrderService {
       description:
         'Want real-time updates on your order? 📦 Click "Check Tracking", enter your Order ID, and stay informed every step of the way! 🚀',
       buttonText: 'Check Tracking',
-      link: `${process.env.FRONTEND_URL}/track-order/${order.trackId}`,
+      link: `${process.env.FRONTEND_URL}/track-order?trackingId=${order.trackId}`,
       email: order.email,
       order: {
         id: order.trackId,
