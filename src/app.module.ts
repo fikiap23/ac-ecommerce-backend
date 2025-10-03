@@ -16,6 +16,7 @@ import { MailModule } from './mail/mail.module';
 import { DriverModule } from './driver/driver.module';
 import { TechnicianModule } from './technician/technician.module';
 import { SettingModule } from './setting/setting.module';
+import { MessageModule } from './message/message.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { SettingModule } from './setting/setting.module';
     DriverModule,
     TechnicianModule,
     SettingModule,
+    MessageModule,
   ],
 })
 export class AppModule implements NestModule {

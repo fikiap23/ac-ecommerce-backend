@@ -25,6 +25,7 @@ import { DriverQuery } from './queries/driver/driver.query';
 import { BundleQuery } from './queries/bundle/bundle.query';
 import { SiteSettingQuery } from './queries/setting/site-setting.query';
 import { SettingSocialQuery } from './queries/setting/setting-social.query';
+import { MessageQuery } from './queries/message/message.query';
 
 @Module({
   imports: [],
@@ -55,6 +56,7 @@ import { SettingSocialQuery } from './queries/setting/setting-social.query';
     BundleQuery,
     SiteSettingQuery,
     SettingSocialQuery,
+    MessageQuery,
   ],
   exports: [
     PrismaService,
@@ -83,6 +85,7 @@ import { SettingSocialQuery } from './queries/setting/setting-social.query';
     BundleQuery,
     SiteSettingQuery,
     SettingSocialQuery,
+    MessageQuery,
   ],
 })
 export class PrismaModule {}

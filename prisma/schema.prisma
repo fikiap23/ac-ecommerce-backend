@@ -698,3 +698,15 @@ model SettingSocial {
 
   @@index([settingId])
 }
+
+model Message {
+  id        Int      @id @default(autoincrement())
+  uuid      String   @unique @default(uuid())
+  name      String
+  category  String
+  email     String?
+  phone     String?
+  message   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
