@@ -110,6 +110,7 @@ export class ProductQuery extends PrismaService {
           bundleImage: { select: { url: true } },
           index: true,
           countTotalSale: true,
+          rating: true,
           items: {
             select: {
               product: {
