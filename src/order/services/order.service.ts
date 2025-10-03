@@ -1511,7 +1511,13 @@ export class OrderService {
         totalPayment: true,
       },
       where: {
-        status: TypeStatusOrder.SHIPPED,
+        status: {
+          in: [
+            TypeStatusOrder.ON_PROGRESS,
+            TypeStatusOrder.DELIVERED,
+            TypeStatusOrder.SHIPPED,
+          ],
+        },
         ...(filter.startDate &&
           filter.endDate && {
             createdAt: {
@@ -1647,7 +1653,13 @@ export class OrderService {
             },
           }),
       where: {
-        status: TypeStatusOrder.SHIPPED,
+        status: {
+          in: [
+            TypeStatusOrder.ON_PROGRESS,
+            TypeStatusOrder.DELIVERED,
+            TypeStatusOrder.SHIPPED,
+          ],
+        },
         createdAt: {
           gte: startDate,
           lte: endDate,
