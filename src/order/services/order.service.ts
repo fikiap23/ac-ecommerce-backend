@@ -922,7 +922,7 @@ export class OrderService {
     }
 
     await this.mailService.sendInvoice({
-      subject: '[NEO] Receipt - Your Order',
+      subject: '[G-Solusi] Receipt - Your Order',
       title: 'Check Tracking',
       description:
         'Want real-time updates on your order? 📦 Click "Check Tracking", enter your Order ID, and stay informed every step of the way! 🚀',
