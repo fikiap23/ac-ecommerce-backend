@@ -320,7 +320,7 @@ export const selectOrderByUuid: Prisma.OrderSelect = {
   spk: true,
 
   // address
-  orderAddress: { select: { address: true } },
+  orderAddress: true,
   recipientAddress: true,
 
   // order items
