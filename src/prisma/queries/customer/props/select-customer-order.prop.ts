@@ -13,6 +13,7 @@ export const SelectGeneralCustomerOrder: Prisma.OrderSelect = {
   orderAddress: {
     select: {
       address: true,
+      city: true,
     },
   },
   orderProduct: {
