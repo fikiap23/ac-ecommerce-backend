@@ -4,19 +4,18 @@ import { IFilterTestimonial } from 'src/testimonial/interface/testimonial.interf
 export const whereTestimonialGetManyPaginate = (props: IFilterTestimonial) => {
   const { search, productId } = props;
 
-  if (!search || search === '') {
-    return {};
-  }
+  const where: Prisma.TestimonialWhereInput = {};
 
-  const where: Prisma.TestimonialWhereInput = {
-    OR: [
+  if (search && search !== '') {
+    where.OR = [
       { name: { contains: search, mode: 'insensitive' } },
       { cityOrDistrict: { contains: search, mode: 'insensitive' } },
-    ],
-  };
+    ];
+  }
 
   if (productId) {
     where.productId = productId;
   }
+
   return { where };
 };
