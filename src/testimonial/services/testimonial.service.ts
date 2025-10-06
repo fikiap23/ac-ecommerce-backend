@@ -40,7 +40,7 @@ export class TestimonialService {
     const product = await this.productRepository.getByUuid({
       uuid: dto.productUuid,
     });
-    const bundle = await this.productRepository.getByUuid({
+    const bundle = await this.productRepository.getBundleByUuid({
       uuid: dto.productUuid,
     });
 
