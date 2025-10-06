@@ -41,16 +41,7 @@ export class CustomerProfileService {
 
     let urlImage: string | undefined;
     if (image) {
-      const fromStorage =
-        await this.customerRepository.checkProfilePictureFromStorage(
-          existCustomer.profilePic,
-        );
-      if (fromStorage) {
-        await this.customerRepository.deleteProfilePicture(
-          existCustomer.profilePic,
-        );
-      }
-      urlImage = await this.customerRepository.uploadProfilePicture(image);
+      urlImage = await this.customerRepository.uploadImage(image);
     }
 
     return this.customerRepository.updateByUuid({

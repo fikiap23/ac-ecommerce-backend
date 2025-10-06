@@ -11,6 +11,8 @@ import { genIdPrefixTimestamp, genSlug } from 'helpers/data.helper';
 import { CreateFileStorageBucketDto } from 'src/gateway/dto/gateway-storage-bucket.dto';
 import { GatewayService } from 'src/gateway/services/gateway.service';
 import { whereCustomerGetManyPaginate } from 'src/prisma/queries/customer/props/where-customer.prop';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 @Injectable()
 export class CustomerRepository {
@@ -31,29 +33,45 @@ export class CustomerRepository {
     );
   }
 
-  async uploadProfilePicture(image: Express.Multer.File) {
-    const fileName = genIdPrefixTimestamp(genSlug(image.originalname));
-    const arg: CreateFileStorageBucketDto = {
-      name: fileName,
-      access: 'PUBLIC',
-      tribe: process.env.TRIBE_STORAGE_BUCKET,
-      service: 'e-commerce/',
-      module: 'customer/',
-      subFolder: 'images/',
-      file: image,
-    };
-    if (process.env.STORAGE_ENABLE === 'true') {
-      await this.gatewayService.httpPostFile(arg);
-    }
-    return `${process.env.BASE_URL_STORAGE_BUCKET}/files/public/${fileName}`;
-  }
-
   async deleteProfilePicture(urlImage: string) {
     const splitted = urlImage.split('/');
     const oldImage = [splitted[splitted.length - 1]];
     if (process.env.STORAGE_ENABLE === 'true') {
       await this.gatewayService.httpDeleteFiles(oldImage);
     }
+  }
+
+  async uploadImage(image: Express.Multer.File) {
+    // Buat nama file unik
+    const ext = path.extname(image.originalname) || '';
+    const base = genSlug(image.originalname.replace(ext, ''));
+    const fileName = `${genIdPrefixTimestamp(base)}${ext.toLowerCase()}`;
+
+    // Simpan ke filesystem di bawah /public/upload/...
+    const fsDir = path.join(
+      process.cwd(),
+      'public',
+      'upload',
+      'customer',
+      'profile',
+    );
+    const absPath = path.join(fsDir, fileName);
+
+    await fs.mkdir(fsDir, { recursive: true });
+
+    // Ambil konten dari buffer (memoryStorage) atau dari path (diskStorage)
+    const content =
+      image.buffer ?? (image.path ? await fs.readFile(image.path) : null);
+
+    if (!content) {
+      throw new Error('Tidak ada konten file yang bisa disimpan.');
+    }
+
+    await fs.writeFile(absPath, content);
+
+    // Kembalikan URL relatif tanpa prefix /public
+    const urlPath = `/upload/customer/profile/${fileName}`;
+    return urlPath;
   }
 
   async getByEmail({
