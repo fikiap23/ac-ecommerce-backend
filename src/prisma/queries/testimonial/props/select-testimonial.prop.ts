@@ -12,6 +12,7 @@ export const selectGeneralTestimonial: Prisma.TestimonialSelect = {
   createdBy: true,
   productId: true,
   userId: true,
+  profileUrl: true,
   product: {
     select: {
       uuid: true,
