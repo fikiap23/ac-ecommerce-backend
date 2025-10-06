@@ -17,15 +17,24 @@ export class CustomerAddressService {
 
   async create(uuid: string, dto: CreateCustomerAddressDto) {
     const customer = await this.customerRepository.getThrowByUuid({ uuid });
+
     const customerAddresses = await this.customerAddressRepository.getMany({
       where: { customerId: customer.id },
     });
-    const isFirstAddress = customerAddresses.length === 0;
-    if (isFirstAddress) {
+
+    const isFirstAddressOfType = !customerAddresses.some(
+      (a) => a.type === dto.type,
+    );
+
+    if (isFirstAddressOfType) {
       dto.isMain = true;
     }
+
     if (dto.isMain) {
-      const existingMain = customerAddresses.find((a) => a.isMain);
+      const existingMain = customerAddresses.find(
+        (a) => a.isMain && a.type === dto.type,
+      );
+
       if (existingMain) {
         await this.customerAddressRepository.updateByUuid({
           addressUuid: existingMain.uuid,
@@ -34,6 +43,7 @@ export class CustomerAddressService {
         });
       }
     }
+
     return await this.customerAddressRepository.create({
       data: {
         ...dto,
@@ -70,21 +80,31 @@ export class CustomerAddressService {
     const customer = await this.customerRepository.getThrowByUuid({
       uuid: customerUuid,
     });
-    await this.customerAddressRepository.getThrowByUuid({
+
+    const targetAddress = await this.customerAddressRepository.getThrowByUuid({
       addressUuid,
       customerId: customer.id,
     });
+
     const customerAddresses = await this.customerAddressRepository.getMany({
       where: { customerId: customer.id },
     });
+
+    const sameTypeAddresses = customerAddresses.filter(
+      (a) => a.type === targetAddress.type,
+    );
+
     if (dto.isMain === false) {
-      const mainAddresses = customerAddresses.filter((a) => a.isMain);
+      const mainAddresses = sameTypeAddresses.filter((a) => a.isMain);
       if (mainAddresses.length === 1 && mainAddresses[0].uuid === addressUuid) {
         dto.isMain = true;
       }
     }
+
     if (dto.isMain === true) {
-      const currentMain = customerAddresses.find((a) => a.isMain);
+      const currentMain = sameTypeAddresses.find(
+        (a) => a.isMain && a.uuid !== addressUuid,
+      );
       if (currentMain) {
         await this.customerAddressRepository.updateByUuid({
           addressUuid: currentMain.uuid,
@@ -93,6 +113,8 @@ export class CustomerAddressService {
         });
       }
     }
+
+    // Update alamat target
     return await this.customerAddressRepository.updateByUuid({
       addressUuid,
       customerId: customer.id,
