@@ -22,6 +22,7 @@ export class TestimonialService {
 
   async create(sub: string, role: string, dto: CreateTestimonialDto) {
     let userId: number | null = null;
+    let profileUrl: string | null = null;
     if (role === 'ADMIN' || role === 'SUPER_ADMIN') {
       const user = await this.userRepository.getThrowByUuid({ uuid: sub });
       userId = user.id;
@@ -30,6 +31,7 @@ export class TestimonialService {
         uuid: sub,
       });
       userId = customer.id;
+      profileUrl = customer.profilePic;
     }
 
     const product = await this.productRepository.getThrowByUuid({
@@ -47,6 +49,7 @@ export class TestimonialService {
         rating: cleanDto.rating,
         status: cleanDto.status,
         userId,
+        profileUrl,
         product: {
           connect: {
             id: product.id,
