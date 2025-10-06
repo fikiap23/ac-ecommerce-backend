@@ -56,8 +56,8 @@ export class TestimonialService {
         status: cleanDto.status,
         userId,
         profileUrl,
-        ...{ product: { connect: { id: product.id } } },
-        ...{ bundle: { connect: { id: bundle.id } } },
+        ...(product ? { product: { connect: { id: product.id } } } : {}),
+        ...(bundle ? { bundle: { connect: { id: bundle.id } } } : {}),
       },
     });
 
