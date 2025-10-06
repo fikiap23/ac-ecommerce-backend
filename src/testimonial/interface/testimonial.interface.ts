@@ -9,4 +9,5 @@ export type IFilterTestimonial = {
   limit: number;
   search?: string;
   productId?: number;
+  bundleId?: number;
 };

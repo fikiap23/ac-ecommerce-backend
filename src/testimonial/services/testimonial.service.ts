@@ -10,6 +10,8 @@ import { selectGeneralTestimonial } from 'src/prisma/queries/testimonial/props/s
 import { UserManagementRepository } from 'src/user-management/repositories/user-management.repository';
 import { CustomerRepository } from 'src/customer/repositories/customer.repository';
 import { ProductRepository } from 'src/product/repositories/product.repository';
+import { OrderRepository } from 'src/order/repositories/order.repository';
+import { OrderProductRepository } from 'src/order/repositories/order-product.repository';
 
 @Injectable()
 export class TestimonialService {
@@ -18,6 +20,7 @@ export class TestimonialService {
     private readonly userRepository: UserManagementRepository,
     private readonly customerRepository: CustomerRepository,
     private readonly productRepository: ProductRepository,
+    private readonly orderProductRepository: OrderProductRepository,
   ) {}
 
   async create(sub: string, role: string, dto: CreateTestimonialDto) {
@@ -34,12 +37,15 @@ export class TestimonialService {
       profileUrl = customer.profilePic;
     }
 
-    const product = await this.productRepository.getThrowByUuid({
+    const product = await this.productRepository.getByUuid({
+      uuid: dto.productUuid,
+    });
+    const bundle = await this.productRepository.getByUuid({
       uuid: dto.productUuid,
     });
 
     const { ...cleanDto } = dto;
-    return await this.testimonialRepository.create({
+    const testimonial = await this.testimonialRepository.create({
       data: {
         cityOrDistrict: cleanDto.cityOrDistrict,
         description: cleanDto.description,
@@ -50,23 +56,43 @@ export class TestimonialService {
         status: cleanDto.status,
         userId,
         profileUrl,
-        product: {
-          connect: {
-            id: product.id,
-          },
-        },
+        ...{ product: { connect: { id: product.id } } },
+        ...{ bundle: { connect: { id: bundle.id } } },
       },
     });
+
+    // update orderProduct
+    if (dto.orderProductUuid) {
+      await this.orderProductRepository.updateByUuid({
+        uuid: dto.orderProductUuid,
+        data: { isTestimonial: true },
+      });
+    }
+
+    return testimonial;
   }
 
   async getAll(filter: SearchTestimonialDto) {
     let productId = undefined;
+    let bundleId = undefined;
     if (filter.productUuid) {
-      const product = await this.productRepository.getThrowByUuid({
+      const product = await this.productRepository.getByUuid({
         uuid: filter.productUuid,
         select: { id: true },
       });
-      productId = product.id;
+
+      if (product) {
+        productId = product.id;
+      } else {
+        const bundle = await this.productRepository.getByUuid({
+          uuid: filter.productUuid,
+          select: { id: true },
+        });
+
+        if (bundle) {
+          bundleId = bundle.id;
+        }
+      }
     }
     return await this.testimonialRepository.getManyPaginate({
       filter: {
@@ -74,6 +100,7 @@ export class TestimonialService {
         page: filter.page,
         sort: filter.sort,
         productId,
+        bundleId,
         search: filter.search,
       },
       select: selectGeneralTestimonial,

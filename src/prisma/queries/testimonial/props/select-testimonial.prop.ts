@@ -11,9 +11,16 @@ export const selectGeneralTestimonial: Prisma.TestimonialSelect = {
   status: true,
   createdBy: true,
   productId: true,
+  bundleId: true,
   userId: true,
   profileUrl: true,
   product: {
+    select: {
+      uuid: true,
+      name: true,
+    },
+  },
+  bundle: {
     select: {
       uuid: true,
       name: true,

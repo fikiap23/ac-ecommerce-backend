@@ -30,6 +30,10 @@ export class CreateTestimonialDto {
   @IsString()
   productUuid: string;
 
+  @IsOptional()
+  @IsString()
+  orderProductUuid: string;
+
   @IsNotEmpty()
   @IsNumber()
   rating: number;

@@ -78,6 +78,7 @@ export const selectGeneralOrder: Prisma.OrderSelect = {
       variantName: true,
       variantCode: true,
       variantImage: true,
+      isTestimonial: true,
       orderProductImage: {
         select: {
           url: true,
@@ -137,6 +138,7 @@ export const selectGeneralListOrders: Prisma.OrderSelect = {
       variantName: true,
       variantCode: true,
       variantImage: true,
+      isTestimonial: true,
     },
   },
   totalPayment: true,
@@ -181,6 +183,7 @@ export const selectGeneralTrackOrder: Prisma.OrderSelect = {
       variantName: true,
       variantCode: true,
       variantImage: true,
+      isTestimonial: true,
       orderProductImage: {
         select: {
           uuid: true,
@@ -250,6 +253,7 @@ export const selectTrackIdAndStatus: Prisma.OrderSelect = {
       variantName: true,
       variantCode: true,
       variantImage: true,
+      isTestimonial: true,
       orderProductImage: {
         select: {
           url: true,
@@ -358,6 +362,7 @@ export const selectOrderByUuid: Prisma.OrderSelect = {
       driverName: true,
       technicianId: true,
       technicianName: true,
+      isTestimonial: true,
       images: {
         select: {
           uuid: true,
@@ -411,6 +416,7 @@ export const selectGeneralTrackOrderUuid: Prisma.OrderSelect = {
       variantName: true,
       variantCode: true,
       variantImage: true,
+      isTestimonial: true,
 
       orderProductImage: {
         select: {

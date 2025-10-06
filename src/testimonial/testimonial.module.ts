@@ -11,6 +11,7 @@ import { UserManagementModule } from 'src/user-management/user-management.module
 import { CustomerModule } from 'src/customer/customer.module';
 import { ProductModule } from 'src/product/product.module';
 import { AuthModule } from 'src/auth/auth.module';
+import { OrderModule } from 'src/order/order.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { AuthModule } from 'src/auth/auth.module';
     CustomerModule,
     ProductModule,
     AuthModule,
+    OrderModule,
   ],
   providers: [
     TestimonialService,

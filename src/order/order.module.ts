@@ -48,6 +48,10 @@ import { DriverModule } from 'src/driver/driver.module';
     OrderCallbackPaymentRepository,
   ],
   controllers: [OrderController],
-  exports: [OrderRepository, OrderCallbackPaymentRepository],
+  exports: [
+    OrderRepository,
+    OrderCallbackPaymentRepository,
+    OrderProductRepository,
+  ],
 })
 export class OrderModule {}

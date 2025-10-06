@@ -206,6 +206,8 @@ model Testimonial {
   rating             Float?
   productId          Int?
   product            Product?              @relation(fields: [productId], references: [id])
+  bundleId           Int?
+  bundle             Bundle?               @relation(fields: [bundleId], references: [id])
   createdBy          String?
   userId             Int?
   profileUrl         String?
@@ -310,6 +312,7 @@ model Bundle {
   items           ProductBundleItem[]
   bundleImage     BundleImage[]
   customerProduct CustomerProduct[]
+  testimonial     Testimonial[]
 }
 
 model BundleImage {
@@ -468,29 +471,30 @@ model OrderImage {
 }
 
 model OrderProduct {
-  id           Int                 @id @default(autoincrement())
-  uuid         String              @unique @default(uuid())
-  packageType  TypeProductPackage?
-  serviceType  TypeProductService?
-  deviceId     String?
-  name         String
-  brand        String?
-  description  String              @db.Text
-  type         String?
-  model        String?
-  capacity     String?
-  variantName  String?
-  variantCode  String?
-  variantImage String?
-  variantId    Int?
-  variantUuid  String?
-  price        Int
-  category     String?
-  quantity     Int
-  discount     Int
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
-  deletedAt    DateTime?
+  id            Int                 @id @default(autoincrement())
+  uuid          String              @unique @default(uuid())
+  packageType   TypeProductPackage?
+  serviceType   TypeProductService?
+  deviceId      String?
+  name          String
+  brand         String?
+  description   String              @db.Text
+  type          String?
+  model         String?
+  capacity      String?
+  variantName   String?
+  variantCode   String?
+  variantImage  String?
+  variantId     Int?
+  variantUuid   String?
+  price         Int
+  category      String?
+  quantity      Int
+  discount      Int
+  isTestimonial Boolean             @default(false)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  deletedAt     DateTime?
 
   remarks String? @db.Text
 

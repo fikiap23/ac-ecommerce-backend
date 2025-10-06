@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { IFilterTestimonial } from 'src/testimonial/interface/testimonial.interface';
 
 export const whereTestimonialGetManyPaginate = (props: IFilterTestimonial) => {
-  const { search, productId } = props;
+  const { search, productId, bundleId } = props;
 
   const where: Prisma.TestimonialWhereInput = {};
 
@@ -15,6 +15,10 @@ export const whereTestimonialGetManyPaginate = (props: IFilterTestimonial) => {
 
   if (productId) {
     where.productId = productId;
+  }
+
+  if (bundleId) {
+    where.bundleId = bundleId;
   }
 
   return { where };
