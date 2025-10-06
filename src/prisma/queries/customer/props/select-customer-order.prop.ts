@@ -47,6 +47,7 @@ export const SelectGeneralCustomerOrder: Prisma.OrderSelect = {
       variantName: true,
       variantCode: true,
       variantImage: true,
+      isTestimonial: true,
       orderProductImage: {
         select: {
           uuid: true,
