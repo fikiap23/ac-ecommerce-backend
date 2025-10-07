@@ -441,8 +441,10 @@ export class OrderService {
           customerId: customer.id,
           discountBundle: minusPrice,
 
-          orderAddress: { create: dto.shippingAddress },
-          recipientAddress: { create: dto.recipientAddress },
+          ...(dto.shippingAddress && { shippingAddress: dto.shippingAddress }),
+          ...(dto.recipientAddress && {
+            recipientAddresss: dto.recipientAddress,
+          }),
 
           // Penting: create berdasarkan DTO CARTS (bukan products.map)
           orderProduct: {

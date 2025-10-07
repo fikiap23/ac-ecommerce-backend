@@ -93,13 +93,13 @@ export class CreateOrderDto {
 
   @ValidateNested()
   @Type(() => ShippingAddressDto)
-  @IsNotEmpty()
-  shippingAddress: ShippingAddressDto;
+  @IsOptional()
+  shippingAddress?: ShippingAddressDto;
 
   @ValidateNested()
   @Type(() => ShippingAddressDto)
-  @IsNotEmpty()
-  recipientAddress: ShippingAddressDto;
+  @IsOptional()
+  recipientAddress?: ShippingAddressDto;
 
   @ValidateNested({ each: true })
   @Type(() => CartItemDto)
