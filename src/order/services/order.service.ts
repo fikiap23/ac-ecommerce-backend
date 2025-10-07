@@ -445,7 +445,7 @@ export class OrderService {
             orderAddress: { create: dto.shippingAddress },
           }),
           ...(dto.recipientAddress && {
-            recipientAddresss: { create: dto.recipientAddress },
+            recipientAddress: { create: dto.recipientAddress },
           }),
 
           // Penting: create berdasarkan DTO CARTS (bukan products.map)
