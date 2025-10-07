@@ -949,7 +949,7 @@ export class OrderService {
         name: order.name,
         phone: order.phoneNumber,
         email: order.email,
-        address: order.orderAddress.address,
+        address: order?.recipientAddress?.address ?? 'Pickup Store',
         products: order.orderProduct.map((p) => ({
           name: p.name,
           price: p?.price?.toString(),
