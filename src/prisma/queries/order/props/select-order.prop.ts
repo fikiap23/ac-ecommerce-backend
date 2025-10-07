@@ -104,11 +104,8 @@ export const selectGeneralListOrders: Prisma.OrderSelect = {
   scheduledAt: true,
   spk: true,
   notes: true,
-  orderAddress: {
-    select: {
-      address: true,
-    },
-  },
+  orderAddress: true,
+  recipientAddress: true,
   orderCallbackPayment: {
     select: {
       externalId: true,
