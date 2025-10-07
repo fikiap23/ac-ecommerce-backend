@@ -637,7 +637,7 @@ export class OrderService {
         name: data.name,
         phone: data.phoneNumber,
         email: data.email,
-        address: data.orderAddress.address,
+        address: data?.recipientAddress?.address ?? 'Pickup Store',
 
         products: carts.map((ci: any) => {
           const p = productByUuid.get(ci.productUuid);
