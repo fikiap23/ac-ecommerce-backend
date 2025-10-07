@@ -36,9 +36,13 @@ export class CustomerOrderService {
 
     await Promise.all(
       orders.data.map(async (order: ISelectGeneralCustomerOrder) => {
-        if (order.expiredAt && order.expiredAt < new Date()) {
+        if (
+          order.expiredAt &&
+          order.expiredAt < new Date() &&
+          order.status === TypeStatusOrder.WAITING_PAYMENT
+        ) {
           await this.orderRepository.update({
-            where: { id: order.id },
+            where: { id: order.id, status: TypeStatusOrder.WAITING_PAYMENT },
             data: {
               status: TypeStatusOrder.CANCELLED,
               expiredAt: null,

@@ -715,7 +715,11 @@ export class OrderService {
       select: selectOrderByUuid,
     });
 
-    if (order.expiredAt && order.expiredAt < new Date()) {
+    if (
+      order.expiredAt &&
+      order.expiredAt < new Date() &&
+      order.status === TypeStatusOrder.WAITING_PAYMENT
+    ) {
       await this.orderRepository.update({
         where: { id: order.id },
         data: {
@@ -761,7 +765,11 @@ export class OrderService {
       select: selectTrackIdAndStatus,
     });
 
-    if (order.expiredAt && order.expiredAt < new Date()) {
+    if (
+      order.expiredAt &&
+      order.expiredAt < new Date() &&
+      order.status === TypeStatusOrder.WAITING_PAYMENT
+    ) {
       await this.orderRepository.update({
         where: { id: order.id },
         data: {
@@ -877,7 +885,10 @@ export class OrderService {
       });
     }
 
-    if (order?.expiredAt < new Date()) {
+    if (
+      order?.expiredAt < new Date() &&
+      order.status === TypeStatusOrder.WAITING_PAYMENT
+    ) {
       await this.orderRepository.update({
         where: { id: order.id },
         data: {
@@ -966,7 +977,7 @@ export class OrderService {
     this.orderValidateRepository.validateCancelOrderExpired(order.expiredAt);
     this.orderValidateRepository.validateCancelOrderStatus(order.status);
     await this.orderRepository.update({
-      where: { id: order.id },
+      where: { id: order.id, status: TypeStatusOrder.WAITING_PAYMENT },
       data: {
         status: TypeStatusOrder.CANCELLED,
         expiredAt: null,
@@ -1013,7 +1024,11 @@ export class OrderService {
 
     await Promise.all(
       orders.data.map(async (order: ISelectGeneralListOrder) => {
-        if (order.expiredAt && order.expiredAt < new Date()) {
+        if (
+          order.expiredAt &&
+          order.expiredAt < new Date() &&
+          order.status === TypeStatusOrder.WAITING_PAYMENT
+        ) {
           await this.orderRepository.update({
             where: { id: order.id },
             data: {
@@ -1143,7 +1158,11 @@ export class OrderService {
       select: selectGeneralTrackOrderUuid,
     });
 
-    if (order.expiredAt && order.expiredAt < new Date()) {
+    if (
+      order.expiredAt &&
+      order.expiredAt < new Date() &&
+      order.status === TypeStatusOrder.WAITING_PAYMENT
+    ) {
       await this.orderRepository.update({
         where: { id: order.id },
         data: {
