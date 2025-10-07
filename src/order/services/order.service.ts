@@ -1067,6 +1067,7 @@ export class OrderService {
           createdAt: order.createdAt,
           name: order.name,
           orderAddress: order.orderAddress,
+          recipientAddress: order.recipientAddress,
           totalPayment: order.totalPayment,
           netAmount: order.netAmount,
           isNetAmountCalculated: order.isNetAmountCalculated,
