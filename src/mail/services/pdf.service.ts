@@ -4,6 +4,11 @@ import autoTable from 'jspdf-autotable';
 import { IOrder } from '../interfaces/invoice.interface';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import {
+  statusOrderToText,
+  filterOrderProduct,
+} from '../../../helpers/data.helper';
+import { OrderProduct } from '@prisma/client';
 
 @Injectable()
 export class PdfService {
@@ -11,209 +16,180 @@ export class PdfService {
 
   async generateInvoicePdf(orderData: IOrder): Promise<Buffer> {
     const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
 
-    // Logo - Add your company logo
-    // Option 1: Use text logo (current implementation)
-    // Option 2: Load from URL using loadImageAsBase64() method below
-    const logoUrl = 'https://picsum.photos/150/50'; // Random image placeholder
+    // Header dengan background biru
+    doc.setFillColor(53, 169, 198); // Warna biru
+    doc.rect(0, 0, pageWidth, 30, 'F');
+
+    // Logo di tengah header (gunakan URL logo asli atau placeholder)
+    const logoUrl = `https://picsum.photos/150/50`; // Sesuaikan dengan logo Anda
 
     try {
       const logoBase64 = await this.loadImageAsBase64(logoUrl);
       if (logoBase64) {
-        doc.addImage(logoBase64, 'PNG', 15, 10, 40, 13);
-      } else {
-        throw new Error('Failed to load logo');
+        // Logo di tengah
+        const logoWidth = 30;
+        const logoHeight = 20;
+        doc.addImage(
+          logoBase64,
+          'PNG',
+          (pageWidth - logoWidth) / 2,
+          5,
+          logoWidth,
+          logoHeight,
+        );
       }
     } catch (error) {
-      // Fallback to text logo if image fails to load
+      // Fallback: text logo di tengah
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(76, 175, 80); // Green color
-      doc.text('G-Solusi', 15, 18);
+      doc.setTextColor(255, 255, 255);
+      doc.text('G-SOLUSI', pageWidth / 2, 18, { align: 'center' });
     }
 
-    // Company Info (right side)
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100);
-    const pageWidth = doc.internal.pageSize.getWidth();
-    doc.text('G-Solusi E-Commerce', pageWidth - 15, 15, { align: 'right' });
-    doc.text('Email: support@gsolusi.id', pageWidth - 15, 20, {
-      align: 'right',
-    });
-    doc.text('Website: www.gsolusi.id', pageWidth - 15, 25, { align: 'right' });
-
-    // Invoice Title
-    doc.setFontSize(20);
+    // Title INVOICE
+    doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(0);
-    doc.text('INVOICE', 15, 40);
+    doc.text('INVOICE', pageWidth / 2, 45, { align: 'center' });
 
-    // Horizontal line
-    doc.setDrawColor(76, 175, 80);
+    // Data Information Section
+    const startY = 60;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Data Information', 15, startY);
+
+    // Garis bawah Data Information
+    doc.setDrawColor(53, 169, 198);
     doc.setLineWidth(0.5);
-    doc.line(15, 45, pageWidth - 15, 45);
+    doc.line(15, startY + 2, pageWidth - 15, startY + 2);
 
-    // Order Information
+    // Data Information Content
     doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('helvetica', 'normal');
     doc.setTextColor(0);
 
-    const startY = 55;
-    doc.text('Order Information', 15, startY);
+    const infoStartY = startY + 12;
+    const labelX = 15;
+    const valueX = 50;
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
+    // ID Order
+    doc.text('ID Order', labelX, infoStartY);
+    doc.text(':', labelX + 30, infoStartY);
+    doc.text(orderData.trackId || '-', valueX, infoStartY);
 
-    // Left column
-    doc.text('Order ID:', 15, startY + 8);
-    doc.text('Customer Name:', 15, startY + 14);
-    doc.text('Email:', 15, startY + 20);
-    doc.text('Phone:', 15, startY + 26);
+    // Nama
+    doc.text('Nama', labelX, infoStartY + 6);
+    doc.text(':', labelX + 30, infoStartY + 6);
+    doc.text(orderData.name || '-', valueX, infoStartY + 6);
 
-    doc.setFont('helvetica', 'bold');
-    doc.text(orderData.id, 50, startY + 8);
-    doc.setFont('helvetica', 'normal');
-    doc.text(orderData.name, 50, startY + 14);
-    doc.text(orderData.email, 50, startY + 20);
-    doc.text(orderData.phone, 50, startY + 26);
+    // Telp
+    doc.text('Telp', labelX, infoStartY + 12);
+    doc.text(':', labelX + 30, infoStartY + 12);
+    doc.text(orderData.phoneNumber || '-', valueX, infoStartY + 12);
 
-    // Right column
-    doc.text('Status:', pageWidth - 80, startY + 8);
-    doc.text('Address:', pageWidth - 80, startY + 14);
+    // Email
+    doc.text('Email', labelX, infoStartY + 18);
+    doc.text(':', labelX + 30, infoStartY + 18);
+    doc.text(orderData.email || '-', valueX, infoStartY + 18);
 
-    // Status with color badge
-    const statusX = pageWidth - 40;
-    const statusY = startY + 8;
-    const statusColor = this.hexToRgb(orderData.statusColor || '#4CAF50');
-    doc.setFillColor(statusColor.r, statusColor.g, statusColor.b);
-    doc.roundedRect(statusX - 2, statusY - 4, 35, 6, 1, 1, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.text(orderData.status, statusX, statusY, { align: 'left' });
+    // Alamat
+    doc.text('Alamat', labelX, infoStartY + 24);
+    doc.text(':', labelX + 30, infoStartY + 24);
+    const address = `${orderData?.recipientAddress?.address},{" "}
+            ${orderData?.recipientAddress?.province?.split('-')[0]},{" "}
+            ${orderData?.recipientAddress?.subDistrict?.split('-')[0]},{" "}
+            ${orderData?.recipientAddress?.suburbOrVillage?.split('-')[0]},{" "}
+            ${orderData?.recipientAddress?.city?.split('-')[0]},{" "}
+            ${orderData?.recipientAddress?.postalCode}`;
 
-    doc.setTextColor(0);
-    doc.setFont('helvetica', 'normal');
-    const addressLines = doc.splitTextToSize(orderData.address, 60);
-    doc.text(addressLines, pageWidth - 40, startY + 14);
+    const addressLines = doc.splitTextToSize(address, pageWidth - valueX - 20);
+    doc.text(addressLines, valueX, infoStartY + 24);
 
     // Products Table
-    const tableStartY = startY + 40;
+    const tableStartY = infoStartY + 40;
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.text('Order Items', 15, tableStartY - 5);
-
-    const tableData = orderData.products.map((product, index) => {
-      const price = parseFloat(product.price) || 0;
-      const discount = parseFloat(product.discount) || 0;
-      const qty = product.qty || 0;
-      const subtotal = (price - discount) * qty;
+    const productData = filterOrderProduct(
+      orderData?.orderProduct as OrderProduct[],
+    );
+    const tableData = productData.map((product: any) => {
+      const price = parseFloat(product?.price) || 0;
+      const qty = product?.quantity || 0;
 
       return [
-        (index + 1).toString(),
-        product.name,
+        product?.bundleName || product?.name || '-',
         `Rp ${this.formatCurrency(price)}`,
         qty.toString(),
-        `Rp ${this.formatCurrency(discount)}`,
-        `Rp ${this.formatCurrency(subtotal)}`,
       ];
     });
 
     autoTable(doc, {
       startY: tableStartY,
-      head: [['No', 'Product Name', 'Price', 'Qty', 'Discount', 'Subtotal']],
+      head: [['Product(s)', 'Price', 'QTY']],
       body: tableData,
-      theme: 'striped',
+      theme: 'grid',
       headStyles: {
-        fillColor: [76, 175, 80],
+        fillColor: [53, 169, 198], // Warna biru untuk header
         textColor: [255, 255, 255],
-        fontSize: 9,
+        fontSize: 10,
         fontStyle: 'bold',
         halign: 'center',
       },
       bodyStyles: {
-        fontSize: 8,
-        textColor: [50, 50, 50],
+        fontSize: 9,
+        textColor: [0, 0, 0],
       },
       columnStyles: {
-        0: { halign: 'center', cellWidth: 10 },
-        1: { halign: 'left', cellWidth: 'auto' },
-        2: { halign: 'right', cellWidth: 30 },
-        3: { halign: 'center', cellWidth: 15 },
-        4: { halign: 'right', cellWidth: 25 },
-        5: { halign: 'right', cellWidth: 30 },
+        0: { halign: 'left', cellWidth: 'auto' },
+        1: { halign: 'center', cellWidth: 60 },
+        2: { halign: 'center', cellWidth: 40 },
       },
-      alternateRowStyles: {
-        fillColor: [245, 245, 245],
-      },
-      margin: { left: 15, right: 15 },
+      margin: { left: 15, right: 15, bottom: 40 },
+      // Pastikan tabel bisa span ke page berikutnya jika produk banyak
+      showHead: 'everyPage',
+      // Minimum tinggi untuk row agar tidak terpotong
+      rowPageBreak: 'auto',
+      tableWidth: 'auto',
     });
 
-    // Payment Summary
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    const summaryX = pageWidth - 75;
+    // Summary Section
+    let finalY = (doc as any).lastAutoTable.finalY + 15;
+    const pageHeight = doc.internal.pageSize.getHeight();
 
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
+    // Cek apakah masih ada ruang untuk summary, jika tidak tambah halaman baru
+    if (finalY + 30 > pageHeight - 20) {
+      doc.addPage();
+      finalY = 20;
+    }
 
-    // Summary box
-    doc.setDrawColor(200);
-    doc.setLineWidth(0.3);
-    doc.rect(summaryX - 5, finalY - 5, 65, 35);
-
-    doc.text('Subtotal:', summaryX, finalY);
-    doc.text(`Rp ${orderData.subtotal}`, pageWidth - 15, finalY, {
-      align: 'right',
-    });
-
-    doc.text('Discount:', summaryX, finalY + 6);
-    doc.text(`Rp ${orderData.totalDiscount}`, pageWidth - 15, finalY + 6, {
-      align: 'right',
-    });
-
-    doc.text('Delivery Fee:', summaryX, finalY + 12);
-    doc.text(`Rp ${orderData.deliveryFee}`, pageWidth - 15, finalY + 12, {
-      align: 'right',
-    });
-
-    // Total with background
-    doc.setFillColor(76, 175, 80);
-    doc.rect(summaryX - 5, finalY + 17, 65, 8, 'F');
-
-    doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
-    doc.setTextColor(255, 255, 255);
-    doc.text('TOTAL:', summaryX, finalY + 23);
-    doc.text(`Rp ${orderData.total}`, pageWidth - 15, finalY + 23, {
-      align: 'right',
-    });
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0);
 
-    // Footer
-    doc.setTextColor(100);
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'italic');
-    const footerY = doc.internal.pageSize.getHeight() - 20;
-
-    doc.setDrawColor(200);
-    doc.line(15, footerY - 5, pageWidth - 15, footerY - 5);
-
-    doc.text('Thank you for your order!', pageWidth / 2, footerY, {
-      align: 'center',
-    });
+    // Total Tagihan
+    doc.text('Total Tagihan :', 15, finalY);
+    doc.setFont('helvetica', 'bold');
     doc.text(
-      'For questions, contact us at support@gsolusi.id',
-      pageWidth / 2,
-      footerY + 5,
-      { align: 'center' },
+      `(Rp ${this.formatCurrency(orderData.totalPayment || 0)})`,
+      pageWidth - 15,
+      finalY,
+      {
+        align: 'right',
+      },
     );
 
-    doc.setFontSize(7);
+    // Status Tagihan
+    doc.setFont('helvetica', 'normal');
+    doc.text('Status Tagihan :', 15, finalY + 8);
+    doc.setFont('helvetica', 'bold');
     doc.text(
-      `Generated on: ${new Date().toLocaleString('id-ID')}`,
-      pageWidth / 2,
-      footerY + 10,
-      { align: 'center' },
+      `${statusOrderToText(orderData.status)}`,
+      pageWidth - 15,
+      finalY + 8,
+      {
+        align: 'right',
+      },
     );
 
     // Convert PDF to buffer

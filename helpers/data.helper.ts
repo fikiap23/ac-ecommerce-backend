@@ -1,3 +1,9 @@
+import {
+  OrderProduct,
+  TypeProductPackage,
+  TypeStatusOrder,
+} from '@prisma/client';
+import { groupBy } from 'lodash';
 import * as moment from 'moment';
 
 export const genIdPrefixTimestamp = (prefix: string) => {
@@ -64,3 +70,80 @@ export function formatToISOE164(phone: string) {
 export function parseFormBoolean(value?: any): boolean {
   return value === 'true' || value === '1';
 }
+
+export function statusOrderToText(status: string) {
+  switch (status) {
+    case TypeStatusOrder.CANCELLED:
+      return 'Dibatalkan';
+    case TypeStatusOrder.DELIVERED:
+      return 'Selesai';
+    case TypeStatusOrder.ON_PROGRESS:
+      return 'Dalam Proses';
+    case TypeStatusOrder.PACKED:
+      return 'Dikemas';
+    case TypeStatusOrder.SHIPPED:
+      return 'Dikirim';
+    case TypeStatusOrder.WAITING_PAYMENT:
+      return 'Menunggu Pembayaran';
+    default:
+      return '-';
+  }
+}
+
+export type GroupedBundleProduct = {
+  bundleGroupId: string;
+  bundleName: string;
+  minusPrice: number;
+  totalPrice: number;
+  quantity: number;
+  bundleImage: string | null;
+  orderProduct: OrderProduct[];
+};
+
+type FilteredOrderProductResult = (GroupedBundleProduct | OrderProduct)[];
+
+export const filterOrderProduct = (
+  orderProduct: OrderProduct[],
+): FilteredOrderProductResult => {
+  const result: FilteredOrderProductResult = [];
+
+  // Separate bundle products and single products
+  const bundleProducts = orderProduct.filter(
+    (item) =>
+      item.sourcePackageType === TypeProductPackage.BUNDLE &&
+      item.bundleGroupId,
+  );
+
+  const singleProducts = orderProduct.filter(
+    (item) =>
+      item.sourcePackageType === TypeProductPackage.SINGLE ||
+      !item.bundleGroupId,
+  );
+
+  // Group bundle products by bundleGroupId
+  const groupedByBundle = groupBy(bundleProducts, 'bundleGroupId');
+
+  // Process grouped bundles
+  Object.entries(groupedByBundle).forEach(([bundleGroupId, products]) => {
+    if (bundleGroupId !== 'null' && products.length > 0) {
+      const firstProduct = products[0];
+      const groupedBundle: GroupedBundleProduct = {
+        bundleGroupId,
+        bundleName: firstProduct.bundleName || '',
+        minusPrice: firstProduct.minusPrice || 0,
+        bundleImage: firstProduct.bundleImage || null,
+        quantity: firstProduct.quantity,
+        totalPrice: products.reduce((acc, product) => acc + product.price, 0),
+        orderProduct: products,
+      };
+      result.push(groupedBundle);
+    }
+  });
+
+  // Add single products directly to result
+  singleProducts.forEach((product) => {
+    result.push(product);
+  });
+
+  return result;
+};
