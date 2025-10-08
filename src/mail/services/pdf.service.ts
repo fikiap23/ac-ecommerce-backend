@@ -25,7 +25,7 @@ export class PdfService {
       const logoBase64 = await this.loadImageAsBase64(logoUrl);
       if (logoBase64) {
         // Logo di tengah
-        const logoWidth = 30;
+        const logoWidth = 20;
         const logoHeight = 20;
         doc.addImage(
           logoBase64,
@@ -172,14 +172,9 @@ export class PdfService {
     doc.setFont('helvetica', 'normal');
     doc.text('Status Tagihan :', 15, finalY + 8);
     doc.setFont('helvetica', 'bold');
-    doc.text(
-      `${statusOrderToText(orderData.status)}`,
-      pageWidth - 15,
-      finalY + 8,
-      {
-        align: 'right',
-      },
-    );
+    doc.text(`${orderData.status}`, pageWidth - 15, finalY + 8, {
+      align: 'right',
+    });
 
     // Convert PDF to buffer
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
