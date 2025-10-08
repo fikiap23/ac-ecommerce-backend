@@ -1574,14 +1574,16 @@ export class OrderService {
     const filterBy = filter.by || 'qty';
     const period = filter.period || 'yearly';
 
-    const year = luxon.DateTime.now().setZone('Asia/Jakarta').year;
-    const month = luxon.DateTime.now().setZone('Asia/Jakarta').month;
-    const day = luxon.DateTime.now().setZone('Asia/Jakarta').day;
+    const nowJakarta = luxon.DateTime.now().setZone('Asia/Jakarta');
+    const year = nowJakarta.year;
+    const month = nowJakarta.month;
+    const day = nowJakarta.day;
 
     let startJakarta: luxon.DateTime;
     let endJakarta: luxon.DateTime;
 
-    if (filter.startDate && filter.endDate) {
+    const isCustomRange = !!(filter.startDate && filter.endDate);
+    if (isCustomRange) {
       startJakarta = luxon.DateTime.fromISO(filter.startDate, {
         zone: 'Asia/Jakarta',
       }).startOf('day');
@@ -1592,7 +1594,7 @@ export class OrderService {
     } else {
       if (period === 'yearly') {
         startJakarta = luxon.DateTime.fromObject(
-          { year, month: 1, day: 1, hour: 0, minute: 0, second: 0 },
+          { year, month: 1, day: 1 },
           { zone: 'Asia/Jakarta' },
         );
         endJakarta = luxon.DateTime.fromObject(
@@ -1601,27 +1603,25 @@ export class OrderService {
         );
       } else if (period === 'monthly') {
         startJakarta = luxon.DateTime.fromObject(
-          { year, month, day: 1, hour: 0, minute: 0, second: 0 },
+          { year, month, day: 1 },
           { zone: 'Asia/Jakarta' },
         );
         endJakarta = startJakarta
           .plus({ months: 1 })
-          .set({ hour: 23, minute: 59, second: 59 });
+          .minus({ milliseconds: 1 });
       } else if (period === 'weekly') {
         const currentJakarta = luxon.DateTime.fromObject(
-          { year, month, day, hour: 0, minute: 0, second: 0 },
+          { year, month, day },
           { zone: 'Asia/Jakarta' },
         );
-        const currentWeekday = currentJakarta.weekday;
-        const daysFromMonday = currentWeekday - 1;
-
+        const daysFromMonday = currentJakarta.weekday - 1;
         startJakarta = currentJakarta.minus({ days: daysFromMonday });
         endJakarta = startJakarta
           .plus({ days: 6 })
           .set({ hour: 23, minute: 59, second: 59 });
       } else if (period === 'daily') {
         startJakarta = luxon.DateTime.fromObject(
-          { year, month, day, hour: 0, minute: 0, second: 0 },
+          { year, month, day },
           { zone: 'Asia/Jakarta' },
         );
         endJakarta = startJakarta.set({ hour: 23, minute: 59, second: 59 });
@@ -1653,25 +1653,57 @@ export class OrderService {
       },
     });
 
-    if (period === 'yearly') {
-      const monthlyData = {};
+    // =========================
+    //  CUSTOM RANGE HANDLER
+    // =========================
+    if (isCustomRange) {
+      const dailyData = {};
 
-      const months = getMonth();
+      // Loop dari startDate → endDate
+      let cursor = startJakarta;
+      while (cursor <= endJakarta) {
+        const dateStr = cursor.toFormat('yyyy-MM-dd');
+        dailyData[dateStr] = 0;
+        cursor = cursor.plus({ days: 1 });
+      }
 
-      months.forEach((month, index) => {
-        monthlyData[month] = 0;
+      // Masukkan hasil dari DB
+      groupedData.forEach((item) => {
+        const jakartaDate = luxon.DateTime.fromJSDate(
+          new Date(item.createdAt),
+        ).setZone('Asia/Jakarta');
+
+        const dateKey = jakartaDate.toFormat('yyyy-MM-dd');
+        if (dailyData.hasOwnProperty(dateKey)) {
+          if (item._sum?.totalPayment) {
+            dailyData[dateKey] += item._sum.totalPayment;
+          } else if (item._count?.id) {
+            dailyData[dateKey] += item._count.id;
+          }
+        }
       });
 
-      groupedData.forEach((item) => {
-        const date = new Date(item.createdAt);
-        const monthIndex = date.getMonth();
-        const monthName = months[monthIndex];
+      return dailyData;
+    }
 
-        if (item._sum?.totalPayment) {
+    // =========================
+    // PERIOD HANDLER
+    // =========================
+    if (period === 'yearly') {
+      const monthlyData = {};
+      const months = getMonth();
+
+      months.forEach((m) => (monthlyData[m] = 0));
+
+      groupedData.forEach((item) => {
+        const date = luxon.DateTime.fromJSDate(item.createdAt).setZone(
+          'Asia/Jakarta',
+        );
+        const monthName = getMonth()[date.month - 1];
+
+        if (item._sum?.totalPayment)
           monthlyData[monthName] += item._sum.totalPayment;
-        } else if (item._count?.id) {
-          monthlyData[monthName] += item._count.id;
-        }
+        else if (item._count?.id) monthlyData[monthName] += item._count.id;
       });
 
       return monthlyData;
@@ -1679,32 +1711,21 @@ export class OrderService {
 
     if (period === 'monthly') {
       const dailyData = {};
-
       const daysInMonth = luxon.DateTime.fromObject(
-        {
-          year: year,
-          month: month,
-        },
+        { year, month },
         { zone: 'Asia/Jakarta' },
       ).daysInMonth;
 
-      for (let day = 1; day <= daysInMonth; day++) {
-        dailyData[day] = 0;
-      }
+      for (let d = 1; d <= daysInMonth; d++) dailyData[d] = 0;
 
       groupedData.forEach((item) => {
-        const jakartaDate = luxon.DateTime.fromJSDate(
-          new Date(item.createdAt),
-        ).setZone('Asia/Jakarta');
-        const dayOfMonth = jakartaDate.day;
-
-        if (dailyData.hasOwnProperty(dayOfMonth)) {
-          if (item._sum?.totalPayment) {
-            dailyData[dayOfMonth] += item._sum.totalPayment;
-          } else if (item._count?.id) {
-            dailyData[dayOfMonth] += item._count.id;
-          }
-        }
+        const date = luxon.DateTime.fromJSDate(item.createdAt).setZone(
+          'Asia/Jakarta',
+        );
+        const dayOfMonth = date.day;
+        if (item._sum?.totalPayment)
+          dailyData[dayOfMonth] += item._sum.totalPayment;
+        else if (item._count?.id) dailyData[dayOfMonth] += item._count.id;
       });
 
       return dailyData;
@@ -1713,23 +1734,16 @@ export class OrderService {
     if (period === 'weekly') {
       const weeklyData = {};
       const dayNames = getDay();
-
-      dayNames.forEach((dayName) => {
-        weeklyData[dayName] = 0;
-      });
+      dayNames.forEach((d) => (weeklyData[d] = 0));
 
       groupedData.forEach((item) => {
-        const jakartaDate = luxon.DateTime.fromJSDate(
-          new Date(item.createdAt),
-        ).setZone('Asia/Jakarta');
-        const dayOfWeek = jakartaDate.weekday;
-        const dayName = dayNames[dayOfWeek - 1];
-
-        if (item._sum?.totalPayment) {
+        const date = luxon.DateTime.fromJSDate(item.createdAt).setZone(
+          'Asia/Jakarta',
+        );
+        const dayName = dayNames[date.weekday - 1];
+        if (item._sum?.totalPayment)
           weeklyData[dayName] += item._sum.totalPayment;
-        } else if (item._count?.id) {
-          weeklyData[dayName] += item._count.id;
-        }
+        else if (item._count?.id) weeklyData[dayName] += item._count.id;
       });
 
       return weeklyData;
@@ -1737,24 +1751,19 @@ export class OrderService {
 
     if (period === 'daily') {
       const hourlyData = {};
-
-      for (let hour = 0; hour <= 23; hour++) {
+      for (let hour = 0; hour < 24; hour++) {
         const hourKey = hour.toString().padStart(2, '0');
         hourlyData[hourKey] = 0;
       }
 
       groupedData.forEach((item) => {
-        const jakartaDate = luxon.DateTime.fromJSDate(
-          new Date(item.createdAt),
-        ).setZone('Asia/Jakarta');
-        const hour = jakartaDate.hour;
-        const hourKey = hour.toString().padStart(2, '0');
-
-        if (item._sum?.totalPayment) {
+        const date = luxon.DateTime.fromJSDate(item.createdAt).setZone(
+          'Asia/Jakarta',
+        );
+        const hourKey = date.hour.toString().padStart(2, '0');
+        if (item._sum?.totalPayment)
           hourlyData[hourKey] += item._sum.totalPayment;
-        } else if (item._count?.id) {
-          hourlyData[hourKey] += item._count.id;
-        }
+        else if (item._count?.id) hourlyData[hourKey] += item._count.id;
       });
 
       return hourlyData;
