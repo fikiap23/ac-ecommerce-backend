@@ -192,12 +192,15 @@ export class OrderService {
       dto.paymentMethod,
     );
 
+    const isCash = this.gatewayXenditRepository.isCash(dto.paymentMethod);
+
     this.orderValidateRepository.validatePaymentMethod(
       isVa,
       isEwallet,
       isQrCode,
       isPaylater,
       isRetailOutlet,
+      isCash,
     );
 
     // === Perhitungan total ===

@@ -66,6 +66,11 @@ export class GatewayXenditRepository {
     return retailOutletCodes.includes(methodCode.toUpperCase());
   }
 
+  isCash(methodCode: string): boolean {
+    const cashCodes = ['BAYAR_DIKASIR'];
+    return cashCodes.includes(methodCode.toUpperCase());
+  }
+
   async httpPostCreateVa(dto: CreateVaDto): Promise<IVaResponse> {
     const url = `${this.baseUrl}/callback_virtual_accounts`;
 

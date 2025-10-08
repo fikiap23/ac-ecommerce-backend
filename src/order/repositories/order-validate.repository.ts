@@ -85,8 +85,16 @@ export class OrderValidateRepository {
     isQrCode: boolean,
     isPaylater: boolean,
     isRetailOutlet: boolean,
+    isCash: boolean,
   ): void {
-    if (!isVa && !isEwallet && !isQrCode && !isPaylater && !isRetailOutlet) {
+    if (
+      !isVa &&
+      !isEwallet &&
+      !isQrCode &&
+      !isPaylater &&
+      !isRetailOutlet &&
+      !isCash
+    ) {
       throw new CustomError({
         message: 'Metode pembayaran tidak valid',
         statusCode: 400,
