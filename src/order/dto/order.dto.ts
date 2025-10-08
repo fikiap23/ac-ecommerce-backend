@@ -235,6 +235,14 @@ export class QueryReportTransactionStatsDto {
   @IsOptional()
   @IsString()
   by: 'revenue' | 'qty';
+
+  @IsOptional()
+  @IsString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsString()
+  endDate?: string;
 }
 
 export class QueryReportRecentTransactionDto extends SearchPaginationDto {

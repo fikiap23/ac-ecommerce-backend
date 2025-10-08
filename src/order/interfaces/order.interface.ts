@@ -63,6 +63,9 @@ export type IFilterReportSummary = {
 export type IFilterReportTransactionStats = {
   period?: 'daily' | 'weekly' | 'monthly' | 'yearly';
   by?: 'revenue' | 'qty';
+
+  startDate?: string;
+  endDate?: string;
 };
 
 export type IFilterReportRecentTransaction = {

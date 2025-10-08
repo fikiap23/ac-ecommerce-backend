@@ -16,4 +16,5 @@ export const orderPaymentMethodDatas: IOrderPaymentMethod[] = [
   { name: 'ID_KREDIVO' },
   { name: 'INDOMARET' },
   { name: 'ALFAMART' },
+  { name: 'BAYAR_DIKASIR' },
 ];

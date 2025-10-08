@@ -1574,108 +1574,70 @@ export class OrderService {
     const filterBy = filter.by || 'qty';
     const period = filter.period || 'yearly';
 
-    let startDate: Date | null = null;
-    let endDate: Date | null = null;
-
     const year = luxon.DateTime.now().setZone('Asia/Jakarta').year;
     const month = luxon.DateTime.now().setZone('Asia/Jakarta').month;
     const day = luxon.DateTime.now().setZone('Asia/Jakarta').day;
 
-    let startJakarta;
-    let endJakarta;
+    let startJakarta: luxon.DateTime;
+    let endJakarta: luxon.DateTime;
 
-    if (period === 'yearly') {
-      startJakarta = luxon.DateTime.fromObject(
-        {
-          year: year,
-          month: 1,
-          day: 1,
-          hour: 0,
-          minute: 0,
-          second: 0,
-          millisecond: 0,
-        },
-        { zone: 'Asia/Jakarta' },
-      );
-      endJakarta = luxon.DateTime.fromObject(
-        {
-          year: year,
-          month: 12,
-          day: 31,
-          hour: 23,
-          minute: 59,
-          second: 59,
-          millisecond: 999,
-        },
-        { zone: 'Asia/Jakarta' },
-      );
-    } else if (period === 'monthly') {
-      startJakarta = luxon.DateTime.fromObject(
-        {
-          year: year,
-          month: month,
-          day: 1,
-          hour: 0,
-          minute: 0,
-          second: 0,
-          millisecond: 0,
-        },
-        { zone: 'Asia/Jakarta' },
-      );
-      endJakarta = startJakarta
-        .plus({ months: 1 })
-        .set({ hour: 23, minute: 59, second: 59, millisecond: 999 });
-    } else if (period === 'weekly') {
-      const currentJakarta = luxon.DateTime.fromObject(
-        {
-          year: year,
-          month: month,
-          day: day,
-          hour: 0,
-          minute: 0,
-          second: 0,
-          millisecond: 0,
-        },
-        { zone: 'Asia/Jakarta' },
-      );
-      const currentWeekday = currentJakarta.weekday;
-      const daysFromMonday = currentWeekday - 1;
+    if (filter.startDate && filter.endDate) {
+      startJakarta = luxon.DateTime.fromISO(filter.startDate, {
+        zone: 'Asia/Jakarta',
+      }).startOf('day');
 
-      startJakarta = currentJakarta.minus({ days: daysFromMonday });
-      endJakarta = startJakarta
-        .plus({ days: 6 })
-        .set({ hour: 23, minute: 59, second: 59, millisecond: 999 });
-    } else if (period === 'daily') {
-      startJakarta = luxon.DateTime.fromObject({
-        year: year,
-        month: month,
-        day: day,
-        hour: 0,
-        minute: 0,
-        second: 0,
-        millisecond: 0,
-      });
-      endJakarta = startJakarta
-        .plus({ days: 1 })
-        .set({ hour: 23, minute: 59, second: 59, millisecond: 999 });
+      endJakarta = luxon.DateTime.fromISO(filter.endDate, {
+        zone: 'Asia/Jakarta',
+      }).endOf('day');
+    } else {
+      if (period === 'yearly') {
+        startJakarta = luxon.DateTime.fromObject(
+          { year, month: 1, day: 1, hour: 0, minute: 0, second: 0 },
+          { zone: 'Asia/Jakarta' },
+        );
+        endJakarta = luxon.DateTime.fromObject(
+          { year, month: 12, day: 31, hour: 23, minute: 59, second: 59 },
+          { zone: 'Asia/Jakarta' },
+        );
+      } else if (period === 'monthly') {
+        startJakarta = luxon.DateTime.fromObject(
+          { year, month, day: 1, hour: 0, minute: 0, second: 0 },
+          { zone: 'Asia/Jakarta' },
+        );
+        endJakarta = startJakarta
+          .plus({ months: 1 })
+          .set({ hour: 23, minute: 59, second: 59 });
+      } else if (period === 'weekly') {
+        const currentJakarta = luxon.DateTime.fromObject(
+          { year, month, day, hour: 0, minute: 0, second: 0 },
+          { zone: 'Asia/Jakarta' },
+        );
+        const currentWeekday = currentJakarta.weekday;
+        const daysFromMonday = currentWeekday - 1;
+
+        startJakarta = currentJakarta.minus({ days: daysFromMonday });
+        endJakarta = startJakarta
+          .plus({ days: 6 })
+          .set({ hour: 23, minute: 59, second: 59 });
+      } else if (period === 'daily') {
+        startJakarta = luxon.DateTime.fromObject(
+          { year, month, day, hour: 0, minute: 0, second: 0 },
+          { zone: 'Asia/Jakarta' },
+        );
+        endJakarta = startJakarta.set({ hour: 23, minute: 59, second: 59 });
+      } else {
+        throw new Error(`Invalid period: ${period}`);
+      }
     }
 
-    startDate = startJakarta.toJSDate();
-    endDate = endJakarta.toJSDate();
+    const startDate = startJakarta.toJSDate();
+    const endDate = endJakarta.toJSDate();
 
     const groupedData = await this.orderRepository.groupBy({
       by: ['createdAt'],
       ...(filterBy === 'qty'
-        ? {
-            _count: {
-              id: true,
-            },
-          }
-        : {
-            _sum: {
-              totalPayment: true,
-            },
-          }),
+        ? { _count: { id: true } }
+        : { _sum: { totalPayment: true } }),
       where: {
         status: {
           in: [
