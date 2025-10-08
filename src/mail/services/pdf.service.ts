@@ -1,14 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { IOrder } from '../interfaces/invoice.interface';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-import {
-  statusOrderToText,
-  filterOrderProduct,
-} from '../../../helpers/data.helper';
-import { OrderProduct } from '@prisma/client';
+import { statusOrderToText } from '../../../helpers/data.helper';
+import { IOrder } from '../interfaces/invoice.interface';
 
 @Injectable()
 export class PdfService {
@@ -23,7 +19,7 @@ export class PdfService {
     doc.rect(0, 0, pageWidth, 30, 'F');
 
     // Logo di tengah header (gunakan URL logo asli atau placeholder)
-    const logoUrl = `https://picsum.photos/150/50`; // Sesuaikan dengan logo Anda
+    const logoUrl = `https://api.gsolusi.id/upload/asset/logo.png`; // Sesuaikan dengan logo Anda
 
     try {
       const logoBase64 = await this.loadImageAsBase64(logoUrl);
@@ -77,7 +73,7 @@ export class PdfService {
     // ID Order
     doc.text('ID Order', labelX, infoStartY);
     doc.text(':', labelX + 30, infoStartY);
-    doc.text(orderData.trackId || '-', valueX, infoStartY);
+    doc.text(orderData.id || '-', valueX, infoStartY);
 
     // Nama
     doc.text('Nama', labelX, infoStartY + 6);
@@ -87,7 +83,7 @@ export class PdfService {
     // Telp
     doc.text('Telp', labelX, infoStartY + 12);
     doc.text(':', labelX + 30, infoStartY + 12);
-    doc.text(orderData.phoneNumber || '-', valueX, infoStartY + 12);
+    doc.text(orderData.phone || '-', valueX, infoStartY + 12);
 
     // Email
     doc.text('Email', labelX, infoStartY + 18);
@@ -97,12 +93,7 @@ export class PdfService {
     // Alamat
     doc.text('Alamat', labelX, infoStartY + 24);
     doc.text(':', labelX + 30, infoStartY + 24);
-    const address = `${orderData?.recipientAddress?.address},{" "}
-            ${orderData?.recipientAddress?.province?.split('-')[0]},{" "}
-            ${orderData?.recipientAddress?.subDistrict?.split('-')[0]},{" "}
-            ${orderData?.recipientAddress?.suburbOrVillage?.split('-')[0]},{" "}
-            ${orderData?.recipientAddress?.city?.split('-')[0]},{" "}
-            ${orderData?.recipientAddress?.postalCode}`;
+    const address = `${orderData?.address}`;
 
     const addressLines = doc.splitTextToSize(address, pageWidth - valueX - 20);
     doc.text(addressLines, valueX, infoStartY + 24);
@@ -110,15 +101,13 @@ export class PdfService {
     // Products Table
     const tableStartY = infoStartY + 40;
 
-    const productData = filterOrderProduct(
-      orderData?.orderProduct as OrderProduct[],
-    );
-    const tableData = productData.map((product: any) => {
+    const productData = orderData?.products || [];
+    const tableData = productData.map((product) => {
       const price = parseFloat(product?.price) || 0;
-      const qty = product?.quantity || 0;
+      const qty = product?.qty || 0;
 
       return [
-        product?.bundleName || product?.name || '-',
+        product?.name || product?.name || '-',
         `Rp ${this.formatCurrency(price)}`,
         qty.toString(),
       ];
@@ -171,7 +160,7 @@ export class PdfService {
     doc.text('Total Tagihan :', 15, finalY);
     doc.setFont('helvetica', 'bold');
     doc.text(
-      `(Rp ${this.formatCurrency(orderData.totalPayment || 0)})`,
+      `(Rp ${this.formatCurrency(Number(orderData.total) || 0)})`,
       pageWidth - 15,
       finalY,
       {
