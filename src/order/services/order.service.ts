@@ -547,35 +547,37 @@ export class OrderService {
             }),
           },
 
-          orderCallbackPayment: {
-            create: {
-              xenditId:
-                va?.id ||
-                ewallet?.id ||
-                qrCode?.id ||
-                paylater?.id ||
-                retailOutlet?.payment_request_id,
-              va: va?.account_number,
-              externalId: va?.external_id,
-              referenceId: ewallet?.reference_id,
-              qrReferenceId: qrCode?.reference_id,
-              qrString: qrCode?.qr_string,
-              desktopCheckoutUrl: ewallet?.actions?.desktop_web_checkout_url,
-              mobileCheckoutUrl: ewallet?.actions?.mobile_web_checkout_url,
-              deepLinkCheckoutUrl:
-                ewallet?.actions?.mobile_deeplink_checkout_url,
-              qrCheckoutString: ewallet?.actions?.qr_checkout_string,
-              retailOutletCode: retailOutlet?.actions?.[0]?.value,
-              retailOutletReferenceId: retailOutlet?.reference_id,
-              paylaterReferenceId: paylater?.reference_id,
-              paylaterDesktopWebCheckoutUrl:
-                paylater?.actions?.desktop_web_checkout_url,
-              paylaterMobileWebCheckoutUrl:
-                paylater?.actions?.mobile_web_checkout_url,
-              paylaterMobileDeeplinkCheckoutUrl:
-                paylater?.actions?.mobile_deeplink_checkout_url,
+          ...(!isCash && {
+            orderCallbackPayment: {
+              create: {
+                xenditId:
+                  va?.id ||
+                  ewallet?.id ||
+                  qrCode?.id ||
+                  paylater?.id ||
+                  retailOutlet?.payment_request_id,
+                va: va?.account_number,
+                externalId: va?.external_id,
+                referenceId: ewallet?.reference_id,
+                qrReferenceId: qrCode?.reference_id,
+                qrString: qrCode?.qr_string,
+                desktopCheckoutUrl: ewallet?.actions?.desktop_web_checkout_url,
+                mobileCheckoutUrl: ewallet?.actions?.mobile_web_checkout_url,
+                deepLinkCheckoutUrl:
+                  ewallet?.actions?.mobile_deeplink_checkout_url,
+                qrCheckoutString: ewallet?.actions?.qr_checkout_string,
+                retailOutletCode: retailOutlet?.actions?.[0]?.value,
+                retailOutletReferenceId: retailOutlet?.reference_id,
+                paylaterReferenceId: paylater?.reference_id,
+                paylaterDesktopWebCheckoutUrl:
+                  paylater?.actions?.desktop_web_checkout_url,
+                paylaterMobileWebCheckoutUrl:
+                  paylater?.actions?.mobile_web_checkout_url,
+                paylaterMobileDeeplinkCheckoutUrl:
+                  paylater?.actions?.mobile_deeplink_checkout_url,
+              },
             },
-          },
+          }),
         },
         select: selectOrderCreate,
       });
