@@ -435,6 +435,7 @@ model Order {
   status                TypeStatusOrder @default(WAITING_PAYMENT)
   notes                 String?
   spk                   String?
+  receiverName          String?
 
   scheduledAt DateTime?
   createdAt   DateTime  @default(now())

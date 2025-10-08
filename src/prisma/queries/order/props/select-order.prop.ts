@@ -106,6 +106,7 @@ export const selectGeneralListOrders: Prisma.OrderSelect = {
   notes: true,
   orderAddress: true,
   recipientAddress: true,
+  receiverName: true,
   orderCallbackPayment: {
     select: {
       externalId: true,
@@ -323,6 +324,7 @@ export const selectOrderByUuid: Prisma.OrderSelect = {
   // address
   orderAddress: true,
   recipientAddress: true,
+  receiverName: true,
 
   // order items
   orderProduct: {

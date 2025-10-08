@@ -1081,6 +1081,7 @@ export class OrderService {
           uuid: order.uuid,
           orderProduct: order.orderProduct,
           trackId: order.trackId,
+          paymentMethod: order.paymentMethod,
           createdAt: order.createdAt,
           name: order.name,
           orderAddress: order.orderAddress,
