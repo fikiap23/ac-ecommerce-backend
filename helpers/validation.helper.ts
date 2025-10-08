@@ -57,6 +57,54 @@ export const videoOrImageFileFilter = (req, file, callback) => {
   }
 };
 
+export const fileFilterImageOrDocument = (
+  req: any,
+  file: Express.Multer.File,
+  callback: (error: Error | null, acceptFile: boolean) => void,
+) => {
+  const imageExts = ['.jpg', '.jpeg', '.png', '.webp'];
+  const docExts = [
+    '.pdf',
+    '.doc',
+    '.docx',
+    '.xls',
+    '.xlsx',
+    '.ppt',
+    '.pptx',
+    '.txt',
+    '.csv',
+    '.rtf',
+  ];
+
+  const imageMimes = ['image/jpeg', 'image/png', 'image/webp'];
+  const docMimes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'text/plain',
+    'text/csv',
+    'application/rtf',
+    'text/rtf',
+  ];
+
+  const ext = path.extname(file.originalname || '').toLowerCase();
+
+  const validExt = imageExts.includes(ext) || docExts.includes(ext);
+  const validMime =
+    imageMimes.includes(file.mimetype) || docMimes.includes(file.mimetype);
+
+  if (validExt || validMime) {
+    return callback(null, true);
+  }
+
+  req.fileValidationError = 'Invalid file type (image/document only)';
+  return callback(new Error('Invalid file type (image/document only)'), false);
+};
+
 export const errorHandler = (response: Response, error: any) => {
   console.log(error);
   // check if the error has the structure of RpcCustomException

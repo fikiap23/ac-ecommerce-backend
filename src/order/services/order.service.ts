@@ -78,7 +78,6 @@ export class OrderService {
     private readonly prismaService: PrismaService,
     private readonly customerVoucher: CustomerVoucherRepository,
     private readonly orderProductRepository: OrderProductRepository,
-    private readonly bundleRepository: BundleRepository,
     private readonly customerProductRepository: CustomerProductRepository,
     private readonly technicianRepository: TechnicianRepository,
     private readonly driverRepository: DriverRepository,
@@ -1091,10 +1090,13 @@ export class OrderService {
           name: order.name,
           orderAddress: order.orderAddress,
           recipientAddress: order.recipientAddress,
+          receiverName: order.receiverName,
           totalPayment: order.totalPayment,
           netAmount: order.netAmount,
           isNetAmountCalculated: order.isNetAmountCalculated,
           status: order.status,
+          evidenceNotes: order.evidenceNotes,
+          evidencePaymentImages: order.evidencePaymentImages,
           expiredAt: order.expiredAt,
         };
       }),
@@ -1208,11 +1210,16 @@ export class OrderService {
     return response;
   }
 
-  async updateOrderStatus(dto: UpdateOrderStatusDto) {
+  async updateOrderStatus(
+    dto: UpdateOrderStatusDto,
+    files: Express.Multer.File[] = [],
+  ) {
     const { orderUuid, status, notes, scheduledAt, spk } = dto;
 
+    // Validasi tanggal
+    let d: Date | null = null;
     if (scheduledAt) {
-      var d = new Date(scheduledAt);
+      d = new Date(scheduledAt);
       if (isNaN(d.getTime())) {
         throw new CustomError({
           message: 'scheduledAt tidak valid',
@@ -1222,12 +1229,22 @@ export class OrderService {
     }
 
     return this.prismaService.execTx(async (tx) => {
-      // pastikan order ada
-      await this.orderRepository.getThrowByUuid({
+      const order = await this.orderRepository.getThrowByUuid({
         uuid: orderUuid,
-        select: { id: true },
+        select: { id: true, evidencePaymentImages: true },
         tx,
       });
+
+      const urls: string[] = [];
+      for (const file of files ?? []) {
+        const url = await this.saveLocalImage(file);
+        urls.push(url);
+      }
+
+      const updatedEvidenceImages = [
+        ...(order.evidencePaymentImages ?? []),
+        ...urls,
+      ];
 
       await this.orderRepository.update({
         where: { uuid: orderUuid },
@@ -1236,6 +1253,11 @@ export class OrderService {
           notes,
           spk,
           scheduledAt: d,
+          receiverName: dto.receiverName,
+          evidenceNotes: dto.evidenceNotes ?? order.evidenceNotes,
+          ...(urls.length
+            ? { evidencePaymentImages: updatedEvidenceImages }
+            : {}),
         },
         tx,
       });

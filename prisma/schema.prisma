@@ -436,7 +436,7 @@ model Order {
   notes                 String?
   spk                   String?
   receiverName          String?
-  evidencePaymentImage  String[]        @default([])
+  evidencePaymentImages String[]        @default([])
   evidenceNotes         String[]        @default([])
 
   scheduledAt DateTime?

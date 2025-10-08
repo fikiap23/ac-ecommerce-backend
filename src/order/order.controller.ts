@@ -27,7 +27,11 @@ import {
 } from './dto/order.dto';
 import { Response } from 'express';
 import { formatResponse } from 'helpers/http.helper';
-import { errorHandler, imageFileFilter } from 'helpers/validation.helper';
+import {
+  errorHandler,
+  fileFilterImageOrDocument,
+  imageFileFilter,
+} from 'helpers/validation.helper';
 import { JwtGuard, RoleGuard } from 'src/auth/guard';
 import { TypeRoleAdmin, TypeRoleUser } from '@prisma/client';
 import { Roles } from 'src/auth/decorator';
@@ -74,15 +78,28 @@ export class OrderController {
     }
   }
 
-  @UseGuards(JwtGuard)
+  @UseGuards(JwtGuard, RoleGuard)
   @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN)
   @Patch('order/status')
-  async updateOrder(@Body() dto: UpdateOrderStatusDto, @Res() res: Response) {
+  @UseInterceptors(
+    AnyFilesInterceptor({
+      fileFilter: fileFilterImageOrDocument,
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB per file
+    }),
+  )
+  async updateOrderStatus(
+    @Body() dto: UpdateOrderStatusDto,
+    @UploadedFiles() files: Express.Multer.File[],
+    @Res() res: Response,
+  ) {
     try {
-      await this.orderService.updateOrderStatus(dto);
+      const evidenceFiles =
+        files?.filter((f) => f.fieldname === 'evidencePaymentImages') ?? [];
+
+      await this.orderService.updateOrderStatus(dto, evidenceFiles);
       return formatResponse(res, HttpStatus.OK, null);
     } catch (error) {
-      errorHandler(res, error);
+      return errorHandler(res, error);
     }
   }
 
@@ -129,7 +146,7 @@ export class OrderController {
       // Urutkan supaya index file selaras dengan index items[]
       const filesByItem = (dto.items ?? []).map((_, i) => bucket[i] ?? []);
 
-      await this.orderService.completeOrderProducts(dto, filesByItem); // <-- ganti service
+      await this.orderService.completeOrderProducts(dto, filesByItem);
       return formatResponse(res, HttpStatus.OK, null);
     } catch (e) {
       return errorHandler(res, e);

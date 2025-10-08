@@ -180,6 +180,15 @@ export class UpdateOrderStatusDto {
   @IsOptional()
   @IsString()
   spk?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  evidenceNotes?: string[];
+
+  @IsOptional()
+  @IsString()
+  receiverName?: string;
 }
 
 export class UpdateOrderProductItemDto {
