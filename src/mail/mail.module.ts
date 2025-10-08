@@ -3,9 +3,12 @@ import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
 import { join } from 'path';
 import { MailService } from './services/mail.service';
+import { PdfService } from './services/pdf.service';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
+    HttpModule,
     MailerModule.forRoot({
       transport: {
         host: process.env.EMAIL_TRANSPORT_HOST,
@@ -29,7 +32,7 @@ import { MailService } from './services/mail.service';
     }),
   ],
   controllers: [],
-  providers: [MailService],
+  providers: [MailService, PdfService],
   exports: [MailService],
 })
 export class MailModule {}
