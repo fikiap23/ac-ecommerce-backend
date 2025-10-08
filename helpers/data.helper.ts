@@ -1,3 +1,9 @@
+import {
+  OrderProduct,
+  TypeProductPackage,
+  TypeStatusOrder,
+} from '@prisma/client';
+import { groupBy } from 'lodash';
 import * as moment from 'moment';
 
 export const genIdPrefixTimestamp = (prefix: string) => {
@@ -64,3 +70,34 @@ export function formatToISOE164(phone: string) {
 export function parseFormBoolean(value?: any): boolean {
   return value === 'true' || value === '1';
 }
+
+export function statusOrderToText(status: string) {
+  switch (status) {
+    case TypeStatusOrder.CANCELLED:
+      return 'Dibatalkan';
+    case TypeStatusOrder.DELIVERED:
+      return 'Selesai';
+    case TypeStatusOrder.ON_PROGRESS:
+      return 'Dalam Proses';
+    case TypeStatusOrder.PACKED:
+      return 'Dikemas';
+    case TypeStatusOrder.SHIPPED:
+      return 'Dikirim';
+    case TypeStatusOrder.WAITING_PAYMENT:
+      return 'Menunggu Pembayaran';
+    default:
+      return '-';
+  }
+}
+
+export type GroupedBundleProduct = {
+  bundleGroupId: string;
+  bundleName: string;
+  minusPrice: number;
+  totalPrice: number;
+  quantity: number;
+  bundleImage: string | null;
+  orderProduct: OrderProduct[];
+};
+
+type FilteredOrderProductResult = (GroupedBundleProduct | OrderProduct)[];
