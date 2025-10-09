@@ -1239,28 +1239,31 @@ export class OrderService {
         tx,
       });
 
-      const deviceIds = order.orderProduct
-        .map((op) => op.deviceId)
-        .filter(Boolean);
+      if (dto.status === TypeStatusOrder.DELIVERED) {
+        const deviceIds = order.orderProduct
+          .map((op) => op.deviceId)
+          .filter(Boolean);
 
-      const usedDevices = await this.orderProductRepository.getManyDevice({
-        where: {
-          deviceId: { in: deviceIds },
-          orderId: { not: order.id },
-        },
-        select: { deviceId: true, uuid: true },
-      });
-
-      const usedDeviceIds = new Set(usedDevices.map((d) => d.deviceId));
-
-      for (const op of order.orderProduct) {
-        const shouldBeOutside = op.deviceId && !usedDeviceIds.has(op.deviceId);
-
-        await this.orderProductRepository.updateByUuid({
-          uuid: op.uuid,
-          data: { isDeviceOutside: shouldBeOutside },
-          tx,
+        const usedDevices = await this.orderProductRepository.getManyDevice({
+          where: {
+            deviceId: { in: deviceIds },
+            orderId: { not: order.id },
+          },
+          select: { deviceId: true, uuid: true },
         });
+
+        const usedDeviceIds = new Set(usedDevices.map((d) => d.deviceId));
+
+        for (const op of order.orderProduct) {
+          const shouldBeOutside =
+            op.deviceId && !usedDeviceIds.has(op.deviceId);
+
+          await this.orderProductRepository.updateByUuid({
+            uuid: op.uuid,
+            data: { isDeviceOutside: shouldBeOutside },
+            tx,
+          });
+        }
       }
 
       const urls: string[] = [];
