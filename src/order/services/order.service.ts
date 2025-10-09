@@ -1234,7 +1234,7 @@ export class OrderService {
         select: {
           id: true,
           evidencePaymentImages: true,
-          orderProduct: { select: { id: true, deviceId: true } },
+          orderProduct: { select: { id: true, uuid: true, deviceId: true } },
         },
         tx,
       });
