@@ -56,7 +56,12 @@ export class OrderProductRepository {
         orderId ? { orderId } : undefined,
         { deviceId: { not: null } },
         { order: { customerId: filter.customerId } },
-        { serviceType: TypeProductService.PRODUCT },
+        {
+          OR: [
+            { serviceType: TypeProductService.PRODUCT },
+            { serviceType: TypeProductService.SERVICE, isDeviceOutside: true },
+          ],
+        },
         search
           ? {
               OR: [
