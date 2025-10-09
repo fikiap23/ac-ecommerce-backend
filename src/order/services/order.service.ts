@@ -1254,15 +1254,40 @@ export class OrderService {
 
         const usedDeviceIds = new Set(usedDevices.map((d) => d.deviceId));
 
+        // Group by deviceId
+        const groupedByDevice: Record<string, typeof order.orderProduct> = {};
         for (const op of order.orderProduct) {
-          const shouldBeOutside =
-            op.deviceId && !usedDeviceIds.has(op.deviceId);
+          if (!op.deviceId) continue;
+          if (!groupedByDevice[op.deviceId]) groupedByDevice[op.deviceId] = [];
+          groupedByDevice[op.deviceId].push(op);
+        }
 
-          await this.orderProductRepository.updateByUuid({
-            uuid: op.uuid,
-            data: { isDeviceOutside: shouldBeOutside },
-            tx,
-          });
+        for (const [deviceId, ops] of Object.entries(groupedByDevice)) {
+          if (usedDeviceIds.has(deviceId)) {
+            for (const op of ops) {
+              await this.orderProductRepository.updateByUuid({
+                uuid: op.uuid,
+                data: { isDeviceOutside: false },
+                tx,
+              });
+            }
+          } else {
+            const [first, ...rest] = ops;
+
+            await this.orderProductRepository.updateByUuid({
+              uuid: first.uuid,
+              data: { isDeviceOutside: true },
+              tx,
+            });
+
+            for (const r of rest) {
+              await this.orderProductRepository.updateByUuid({
+                uuid: r.uuid,
+                data: { isDeviceOutside: false },
+                tx,
+              });
+            }
+          }
         }
       }
 
