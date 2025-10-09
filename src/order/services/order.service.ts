@@ -20,7 +20,7 @@ import {
   ISelectGeneralOrder,
 } from '../interfaces/order.interface';
 import { GatewayService } from 'src/gateway/services/gateway.service';
-import { Prisma, TypeStatusOrder } from '@prisma/client';
+import { Prisma, TypeProductService, TypeStatusOrder } from '@prisma/client';
 import { GatewayXenditRepository } from 'src/gateway/repositories/gateway-xendit.repository';
 import { MailService } from 'src/mail/services/mail.service';
 import { CustomError } from 'helpers/http.helper';
@@ -1231,9 +1231,37 @@ export class OrderService {
     return this.prismaService.execTx(async (tx) => {
       const order = await this.orderRepository.getThrowByUuid({
         uuid: orderUuid,
-        select: { id: true, evidencePaymentImages: true },
+        select: {
+          id: true,
+          evidencePaymentImages: true,
+          orderProduct: { select: { id: true, deviceId: true } },
+        },
         tx,
       });
+
+      const deviceIds = order.orderProduct
+        .map((op) => op.deviceId)
+        .filter(Boolean);
+
+      const usedDevices = await this.orderProductRepository.getManyDevice({
+        where: {
+          deviceId: { in: deviceIds },
+          orderId: { not: order.id },
+        },
+        select: { deviceId: true, uuid: true },
+      });
+
+      const usedDeviceIds = new Set(usedDevices.map((d) => d.deviceId));
+
+      for (const op of order.orderProduct) {
+        const shouldBeOutside = op.deviceId && !usedDeviceIds.has(op.deviceId);
+
+        await this.orderProductRepository.updateByUuid({
+          uuid: op.uuid,
+          data: { isDeviceOutside: shouldBeOutside },
+          tx,
+        });
+      }
 
       const urls: string[] = [];
       for (const file of files ?? []) {
@@ -1551,7 +1579,6 @@ export class OrderService {
     return this.orderProductRepository.getManyDevice({
       where: {
         deviceId,
-        ...(customer && { order: { customerId: customer.id } }),
       },
       select: selectOrderProductDevice,
     });
