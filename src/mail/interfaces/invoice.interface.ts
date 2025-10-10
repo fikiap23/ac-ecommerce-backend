@@ -18,6 +18,7 @@ export interface IOrder {
   total: string;
   status: string;
   statusColor: string;
+  createdAt: Date;
 }
 
 export interface IEmailInvoice {
