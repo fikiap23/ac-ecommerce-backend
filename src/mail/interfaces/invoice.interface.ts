@@ -1,3 +1,5 @@
+import { OrderProduct } from '@prisma/client';
+
 export interface IProduct {
   name: string;
   price: string;
@@ -11,7 +13,7 @@ export interface IOrder {
   phone: string;
   email: string;
   address: string;
-  products: IProduct[];
+  orderProducts: OrderProduct[];
   subtotal: string;
   totalDiscount: string;
   deliveryFee: string;

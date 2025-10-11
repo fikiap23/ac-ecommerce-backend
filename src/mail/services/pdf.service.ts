@@ -3,7 +3,10 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-import { statusOrderToText } from '../../../helpers/data.helper';
+import {
+  filterOrderProduct,
+  statusOrderToText,
+} from '../../../helpers/data.helper';
 import { IOrder } from '../interfaces/invoice.interface';
 
 @Injectable()
@@ -111,14 +114,16 @@ export class PdfService {
     // Products Table
     const tableStartY = startY + 42;
 
-    const productData = orderData?.products || [];
-    const tableData = productData.map((product) => {
-      const price = parseFloat(product?.price) || 0;
-      const qty = product?.qty || 0;
+    const productData = filterOrderProduct(orderData?.orderProducts);
+    const tableData = productData.map((product: any) => {
+      const price = product?.bundleGroupId
+        ? (product?.totalPrice || 0) - (product?.minusPrice || 0)
+        : parseFloat(product?.price) || 0;
+      const qty = product?.quantity || 0;
       const total = price * qty;
 
       return [
-        product?.name || product?.name || '-',
+        product?.bundleName || product?.name || '-',
         qty.toString(),
         `Rp ${this.formatCurrency(price)}`,
         `Rp ${this.formatCurrency(total)}`,
@@ -131,18 +136,14 @@ export class PdfService {
       body: tableData,
       foot: [
         [
-          {
-            content: 'Terbilang :',
-            rowSpan: 2,
-            styles: { valign: 'top', fontSize: 9 },
-          },
+          '',
           '',
           {
             content: 'TOTAL',
-            rowSpan: 2,
+            rowSpan: 1,
             styles: {
               valign: 'middle',
-              fontSize: 11,
+              fontSize: 9,
               fontStyle: 'bold',
               halign: 'left',
               fillColor: [43, 192, 228],
@@ -150,17 +151,16 @@ export class PdfService {
           },
           {
             content: `Rp ${this.formatCurrency(Number(orderData.total) || 0)}`,
-            rowSpan: 2,
+            rowSpan: 1,
             styles: {
               valign: 'middle',
-              fontSize: 11,
+              fontSize: 9,
               fontStyle: 'bold',
               halign: 'center',
               fillColor: [43, 192, 228],
             },
           },
         ],
-        ['', '', '', ''],
       ],
       theme: 'grid',
       headStyles: {
@@ -219,6 +219,20 @@ export class PdfService {
         }
       },
     });
+
+    // Bill Status section below table
+    const finalY = (doc as any).lastAutoTable.finalY || tableStartY + 50;
+    const billStatusY = finalY + 10;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0);
+
+    // Left side: "Bill Status:"
+    doc.text('Bill Status:', 15, billStatusY);
+
+    // Right side: actual status value (using orderData status)
+    doc.text(orderData.status, pageWidth - 15, billStatusY, { align: 'right' });
 
     // Convert PDF to buffer
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
