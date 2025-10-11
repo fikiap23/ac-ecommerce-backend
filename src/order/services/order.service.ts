@@ -644,6 +644,7 @@ export class OrderService {
         phone: data.phoneNumber,
         email: data.email,
         address: data?.recipientAddress?.address ?? 'Pickup Store',
+        createdAt: data.createdAt,
 
         products: carts.map((ci: any) => {
           const p = productByUuid.get(ci.productUuid);
@@ -954,6 +955,7 @@ export class OrderService {
         phone: order.phoneNumber,
         email: order.email,
         address: order?.recipientAddress?.address ?? 'Pickup Store',
+        createdAt: order.createdAt,
         products: order.orderProduct.map((p) => ({
           name: p.name,
           price: p?.price?.toString(),
