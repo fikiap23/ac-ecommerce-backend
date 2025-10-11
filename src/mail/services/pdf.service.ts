@@ -14,10 +14,6 @@ export class PdfService {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    // Header dengan background biru
-    doc.setFillColor(53, 169, 198); // Warna biru
-    doc.rect(0, 0, pageWidth, 30, 'F');
-
     // ganti headerUrlnya
     const headerUrl = 'https://api.gsolusi.id/upload/asset/g-solusi-header.png';
 
@@ -39,9 +35,6 @@ export class PdfService {
       }
     } catch (error) {
       console.error('Failed to load header image:', error);
-      // Fallback: tambahkan background biru jika gambar gagal load
-      doc.setFillColor(43, 192, 228);
-      doc.rect(0, 0, pageWidth, 25, 'F');
     }
 
     // Text informasi alamat dan kontak di bawah header
