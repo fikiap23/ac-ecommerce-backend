@@ -22,15 +22,18 @@ export class MailService {
       from: 'no-reply@gsolusi.id',
       context: {
         ...data,
-        orderProducts: filterOrderProduct(data?.order?.orderProducts)?.map(
-          (product: any) => ({
-            name: product?.bundleName || product?.name || '-',
-            price: product?.bundleGroupId
-              ? (product?.totalPrice || 0) - (product?.minusPrice || 0)
-              : parseFloat(product?.price) || 0,
-            qty: product?.quantity || '-',
-          }),
-        ),
+        order: {
+          ...data.order,
+          orderProducts: filterOrderProduct(data?.order?.orderProducts)?.map(
+            (product: any) => ({
+              name: product?.bundleName || product?.name || '-',
+              price: product?.bundleGroupId
+                ? (product?.totalPrice || 0) - (product?.minusPrice || 0)
+                : parseFloat(product?.price) || 0,
+              qty: product?.quantity || '-',
+            }),
+          ),
+        },
       },
       attachments: [
         {
