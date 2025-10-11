@@ -19,7 +19,7 @@ export class PdfService {
     doc.rect(0, 0, pageWidth, 30, 'F');
 
     // ganti headerUrlnya
-    const headerUrl = 'http://localhost:5173/images/g-solusi-header.png';
+    const headerUrl = 'https://api.gsolusi.id/upload/asset/g-solusi-header.png';
 
     try {
       const headerBase64 = await this.loadImageAsBase64(headerUrl);
