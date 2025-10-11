@@ -133,7 +133,10 @@ export const filterOrderProduct = (
         minusPrice: firstProduct.minusPrice || 0,
         bundleImage: firstProduct.bundleImage || null,
         quantity: firstProduct.quantity,
-        totalPrice: products.reduce((acc, product) => acc + product.price, 0),
+        totalPrice: products.reduce(
+          (acc, product) => Number(acc) + Number(product.price),
+          0,
+        ),
         orderProduct: products,
       };
       result.push(groupedBundle);
