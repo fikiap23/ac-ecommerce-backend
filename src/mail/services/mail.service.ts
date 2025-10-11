@@ -2,6 +2,7 @@ import { MailerService } from '@nestjs-modules/mailer';
 import { Injectable } from '@nestjs/common';
 import { IEmailInvoice } from '../interfaces/invoice.interface';
 import { PdfService } from './pdf.service';
+import { filterOrderProduct } from 'helpers/data.helper';
 
 @Injectable()
 export class MailService {
@@ -21,6 +22,15 @@ export class MailService {
       from: 'no-reply@gsolusi.id',
       context: {
         ...data,
+        orderProducts: filterOrderProduct(data?.order?.orderProducts)?.map(
+          (product: any) => ({
+            name: product?.bundleName || product?.name || '-',
+            price: product?.bundleGroupId
+              ? (product?.totalPrice || 0) - (product?.minusPrice || 0)
+              : parseFloat(product?.price) || 0,
+            qty: product?.quantity || '-',
+          }),
+        ),
       },
       attachments: [
         {

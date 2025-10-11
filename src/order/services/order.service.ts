@@ -646,7 +646,7 @@ export class OrderService {
         address: data?.recipientAddress?.address ?? 'Pickup Store',
         createdAt: data.createdAt,
 
-        products: carts.map((ci: any) => {
+        orderProducts: carts.map((ci: any) => {
           const p = productByUuid.get(ci.productUuid);
           if (!p) {
             throw new CustomError({
@@ -675,10 +675,17 @@ export class OrderService {
             }
 
             const priceNum = variant.salePrice ?? variant.regularPrice;
+
+            const displayName =
+              p.name === variant.name
+                ? `${p.name} - ${variant.code}`
+                : `${p.name} - ${variant.name} - ${variant.code}`;
+
             return {
-              name: `${p.name} - ${variant.name}`,
+              ...ci,
+              name: displayName,
               price: String(priceNum),
-              qty: ci.quantity,
+              quantity: ci.quantity,
               discount: '0',
             };
           }
@@ -692,9 +699,10 @@ export class OrderService {
           }
 
           return {
+            ...ci,
             name: p.name,
             price: String(priceNum),
-            qty: ci.quantity,
+            quantity: ci.quantity,
             discount: '0',
           };
         }),
@@ -956,12 +964,7 @@ export class OrderService {
         email: order.email,
         address: order?.recipientAddress?.address ?? 'Pickup Store',
         createdAt: order.createdAt,
-        products: order.orderProduct.map((p) => ({
-          name: p.name,
-          price: p?.price?.toString(),
-          qty: p.quantity,
-          discount: p.discount.toString(),
-        })),
+        orderProducts: order.orderProduct,
         subtotal: order.subTotalPay.toString(),
         totalDiscount: order.voucherDiscount.toString(),
         deliveryFee: order.deliveryFee.toString(),
