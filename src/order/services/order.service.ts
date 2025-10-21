@@ -1251,54 +1251,40 @@ export class OrderService {
           .map((op) => op.deviceId)
           .filter(Boolean);
 
+        // ambil semua pemakaian device di order lain (SERVICE atau PRODUCT)
         const usedDevices = await this.orderProductRepository.getManyDevice({
           where: {
             deviceId: { in: deviceIds },
             orderId: { not: order.id },
-            serviceType: TypeProductService.SERVICE,
           },
-          select: { deviceId: true, uuid: true, serviceType: true },
+          select: { deviceId: true, serviceType: true },
         });
 
-        const usedDeviceIds = new Set(usedDevices.map((d) => d.deviceId));
+        const usedDeviceIds = new Set(usedDevices.map((u) => u.deviceId));
 
-        // group orderProduct by deviceId
-        const groupedByDevice: Record<string, typeof order.orderProduct> = {};
         for (const op of order.orderProduct) {
           if (!op.deviceId) continue;
-          if (!groupedByDevice[op.deviceId]) groupedByDevice[op.deviceId] = [];
-          groupedByDevice[op.deviceId].push(op);
-        }
 
-        for (const [deviceId, ops] of Object.entries(groupedByDevice)) {
-          if (usedDeviceIds.has(deviceId)) {
-            for (const op of ops) {
-              console.log(` - ${op.uuid} -> false`);
-              await this.orderProductRepository.updateByUuid({
-                uuid: op.uuid,
-                data: { isDeviceOutside: false },
-                tx,
+          const hasUsed = usedDeviceIds.has(op.deviceId);
+
+          // ==== APPLY RULES ====
+
+          if (op.serviceType === TypeProductService.PRODUCT) {
+            if (hasUsed) {
+              throw new CustomError({
+                message: `Device ${op.deviceId} already used by another order`,
+                statusCode: 400,
               });
             }
-            continue;
-          }
-
-          // belum pernah dipakai (SERVICE)
-          const isService = ops.every(
-            (o) => o.serviceType === TypeProductService.SERVICE,
-          );
-
-          const [first, ...rest] = ops;
-          await this.orderProductRepository.updateByUuid({
-            uuid: first.uuid,
-            data: { isDeviceOutside: isService },
-            tx,
-          });
-
-          for (const r of rest) {
             await this.orderProductRepository.updateByUuid({
-              uuid: r.uuid,
+              uuid: op.uuid,
               data: { isDeviceOutside: false },
+              tx,
+            });
+          } else if (op.serviceType === TypeProductService.SERVICE) {
+            await this.orderProductRepository.updateByUuid({
+              uuid: op.uuid,
+              data: { isDeviceOutside: hasUsed ? false : true },
               tx,
             });
           }
