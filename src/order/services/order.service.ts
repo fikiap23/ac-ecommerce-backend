@@ -1239,7 +1239,9 @@ export class OrderService {
         select: {
           id: true,
           evidencePaymentImages: true,
-          orderProduct: { select: { id: true, uuid: true, deviceId: true } },
+          orderProduct: {
+            select: { id: true, uuid: true, deviceId: true, serviceType: true },
+          },
         },
         tx,
       });
@@ -1269,9 +1271,9 @@ export class OrderService {
         }
 
         for (const [deviceId, ops] of Object.entries(groupedByDevice)) {
-          // jika device sudah pernah dipakai di order lain → semua false
           if (usedDeviceIds.has(deviceId)) {
             for (const op of ops) {
+              console.log(` - ${op.uuid} -> false`);
               await this.orderProductRepository.updateByUuid({
                 uuid: op.uuid,
                 data: { isDeviceOutside: false },
@@ -1281,13 +1283,11 @@ export class OrderService {
             continue;
           }
 
-          // device BELUM PERNAH dipakai
-          // cek apakah semua ops ber-serviceType SERVICE
+          // belum pernah dipakai (SERVICE)
           const isService = ops.every(
             (o) => o.serviceType === TypeProductService.SERVICE,
           );
 
-          // hanya satu yg boleh true (first)
           const [first, ...rest] = ops;
           await this.orderProductRepository.updateByUuid({
             uuid: first.uuid,
