@@ -78,60 +78,65 @@ export class ProductQuery extends PrismaService {
     const skip = (page - 1) * limit;
 
     // get product + bundle
+    const bundlePromise =
+      filter?.serviceType === 'PRODUCT'
+        ? prisma.bundle.findMany({
+            where: {
+              deletedAt: null,
+              isHide: filter?.isHide && parseFormBoolean(filter?.isHide),
+              isActive: filter?.isActive && parseFormBoolean(filter?.isActive),
+              items: {
+                every: {
+                  product: {
+                    deletedAt: null,
+                    ...(filter?.isActive && {
+                      isActive: parseFormBoolean(filter?.isActive),
+                    }),
+                  },
+                },
+              },
+            },
+            select: {
+              uuid: true,
+              name: true,
+              description: true,
+              price: true,
+              isActive: true,
+              createdAt: true,
+              bundleImage: { select: { url: true } },
+              index: true,
+              countTotalSale: true,
+              rating: true,
+              items: {
+                select: {
+                  product: {
+                    select: {
+                      uuid: true,
+                      name: true,
+                      price: true,
+                      productImage: { select: { url: true } },
+                      productVariant: { include: { capacity: true } },
+                      countTotalSale: true,
+                      categoryProduct: true,
+                      type: true,
+                      model: true,
+                      capacity: true,
+                    },
+                  },
+                },
+              },
+            },
+            orderBy,
+          })
+        : Promise.resolve([]);
+
     const [products, bundles] = await Promise.all([
       prisma.product.findMany({
         where: { ...where, deletedAt: null },
         select,
         orderBy,
       }),
-      prisma.bundle.findMany({
-        where: {
-          deletedAt: null,
-          isHide: filter?.isHide && parseFormBoolean(filter?.isHide),
-          isActive: filter?.isActive && parseFormBoolean(filter?.isActive),
-          items: {
-            every: {
-              product: {
-                deletedAt: null,
-                ...(filter?.isActive && {
-                  isActive: parseFormBoolean(filter?.isActive),
-                }),
-              },
-            },
-          },
-        },
-        select: {
-          uuid: true,
-          name: true,
-          description: true,
-          price: true,
-          isActive: true,
-          createdAt: true,
-          bundleImage: { select: { url: true } },
-          index: true,
-          countTotalSale: true,
-          rating: true,
-          items: {
-            select: {
-              product: {
-                select: {
-                  uuid: true,
-                  name: true,
-                  price: true,
-                  productImage: { select: { url: true } },
-                  productVariant: { include: { capacity: true } },
-                  countTotalSale: true,
-                  categoryProduct: true,
-                  type: true,
-                  model: true,
-                  capacity: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy,
-      }),
+      bundlePromise,
     ]);
 
     // combine product + bundle
