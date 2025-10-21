@@ -215,6 +215,7 @@ export class ProductService {
                           salePrice: v.salePrice ?? null,
                           specification: v.specification ?? null,
                           photoUrl: variantPhotoUrls?.[idx] || null,
+                          index: v.index,
                           ...(v.capacityUuid
                             ? {
                                 capacity: { connect: { uuid: v.capacityUuid } },
@@ -567,6 +568,7 @@ export class ProductService {
               salePrice: v.salePrice ?? undefined,
               specification: v.specification ?? undefined,
               photoUrl: newPhotoUrl ?? undefined,
+              index: v.index,
               ...(capacityField ? { capacity: capacityField } : {}),
             };
 
@@ -586,6 +588,7 @@ export class ProductService {
               salePrice: v.salePrice ?? null,
               specification: v.specification ?? null,
               photoUrl: newPhotoUrl ?? null,
+              index: v.index ?? null,
               ...(v.capacityUuid
                 ? { capacity: { connect: { uuid: v.capacityUuid } } }
                 : {}),
