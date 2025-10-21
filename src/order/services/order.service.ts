@@ -1253,6 +1253,7 @@ export class OrderService {
           where: {
             deviceId: { in: deviceIds },
             orderId: { not: order.id },
+            serviceType: TypeProductService.SERVICE,
           },
           select: { deviceId: true, uuid: true, serviceType: true },
         });
