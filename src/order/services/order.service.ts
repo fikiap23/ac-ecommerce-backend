@@ -1253,14 +1253,13 @@ export class OrderService {
           where: {
             deviceId: { in: deviceIds },
             orderId: { not: order.id },
-            serviceType: { not: TypeProductService.PRODUCT },
           },
-          select: { deviceId: true, uuid: true },
+          select: { deviceId: true, uuid: true, serviceType: true },
         });
 
         const usedDeviceIds = new Set(usedDevices.map((d) => d.deviceId));
 
-        // Group by deviceId
+        // group orderProduct by deviceId
         const groupedByDevice: Record<string, typeof order.orderProduct> = {};
         for (const op of order.orderProduct) {
           if (!op.deviceId) continue;
@@ -1269,6 +1268,7 @@ export class OrderService {
         }
 
         for (const [deviceId, ops] of Object.entries(groupedByDevice)) {
+          // jika device sudah pernah dipakai di order lain → semua false
           if (usedDeviceIds.has(deviceId)) {
             for (const op of ops) {
               await this.orderProductRepository.updateByUuid({
@@ -1277,22 +1277,29 @@ export class OrderService {
                 tx,
               });
             }
-          } else {
-            const [first, ...rest] = ops;
+            continue;
+          }
 
+          // device BELUM PERNAH dipakai
+          // cek apakah semua ops ber-serviceType SERVICE
+          const isService = ops.every(
+            (o) => o.serviceType === TypeProductService.SERVICE,
+          );
+
+          // hanya satu yg boleh true (first)
+          const [first, ...rest] = ops;
+          await this.orderProductRepository.updateByUuid({
+            uuid: first.uuid,
+            data: { isDeviceOutside: isService },
+            tx,
+          });
+
+          for (const r of rest) {
             await this.orderProductRepository.updateByUuid({
-              uuid: first.uuid,
-              data: { isDeviceOutside: true },
+              uuid: r.uuid,
+              data: { isDeviceOutside: false },
               tx,
             });
-
-            for (const r of rest) {
-              await this.orderProductRepository.updateByUuid({
-                uuid: r.uuid,
-                data: { isDeviceOutside: false },
-                tx,
-              });
-            }
           }
         }
       }
