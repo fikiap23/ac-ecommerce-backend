@@ -53,4 +53,8 @@ export class SearchTestimonialDto extends SearchPaginationDto {
   @IsOptional()
   @IsString()
   productUuid?: string;
+
+  @IsOptional()
+  @IsEnum(TypeStatusTestimonial)
+  status?: TypeStatusTestimonial;
 }

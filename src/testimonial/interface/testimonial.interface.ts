@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, TypeStatusTestimonial } from '@prisma/client';
 
 export type ICreateTestimonial = Prisma.TestimonialCreateInput;
 export type IUpdateTestimonial = Prisma.TestimonialUpdateInput;
@@ -10,4 +10,5 @@ export type IFilterTestimonial = {
   search?: string;
   productId?: number;
   bundleId?: number;
+  status?: TypeStatusTestimonial;
 };

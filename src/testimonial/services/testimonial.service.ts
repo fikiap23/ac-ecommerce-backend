@@ -101,6 +101,7 @@ export class TestimonialService {
         sort: filter.sort,
         productId,
         bundleId,
+        status: filter.status,
         search: filter.search,
       },
       select: selectGeneralTestimonial,
