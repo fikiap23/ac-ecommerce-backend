@@ -119,3 +119,23 @@ export async function deleteFilesBestEffort(absPaths: string[]) {
     ),
   );
 }
+
+export async function copyFile(
+  sourceAbsPath: string,
+  targetDir: string,
+): Promise<string> {
+  const fs = require('fs').promises;
+  const path = require('path');
+
+  const filename = path.basename(sourceAbsPath);
+  const ext = path.extname(filename);
+  const nameWithoutExt = path.basename(filename, ext);
+  const timestamp = Date.now();
+  const newFilename = `${nameWithoutExt}_${timestamp}${ext}`;
+  const targetAbsPath = path.join(targetDir, newFilename);
+
+  await fs.mkdir(targetDir, { recursive: true });
+  await fs.copyFile(sourceAbsPath, targetAbsPath);
+
+  return targetAbsPath;
+}

@@ -23,6 +23,7 @@ import { CapacityRepository } from '../repositories/capacity.repository';
 import { TypeRepository } from '../repositories/type.repository';
 import {
   assertImages,
+  copyFile,
   deleteFilesBestEffort,
   saveImages,
   urlToAbs,
@@ -756,6 +757,248 @@ export class ProductService {
     } catch (e) {
       // rollback file baru jika transaksi gagal
       await deleteFilesBestEffort(allAbsToCleanup);
+      throw e;
+    }
+  }
+
+  async duplicateProductByUuid(uuid: string) {
+    const existingProduct = await this.prisma.product.findUnique({
+      where: { uuid },
+      include: {
+        productImage: true,
+        productVariant: true,
+        type: true,
+        model: true,
+        capacity: true,
+        categoryProduct: true,
+      },
+    });
+
+    const existingBundle = !existingProduct
+      ? await this.prisma.bundle.findUnique({
+          where: { uuid },
+          include: {
+            bundleImage: true,
+            items: {
+              include: {
+                product: {
+                  select: { id: true, uuid: true, name: true, price: true },
+                },
+              },
+            },
+          },
+        })
+      : null;
+
+    if (!existingProduct && !existingBundle) {
+      throw new CustomError({
+        message: 'Produk tidak ditemukan',
+        statusCode: 404,
+      });
+    }
+
+    const isSingle = !!existingProduct;
+    const isBundle = !!existingBundle;
+
+    // Helper function untuk copy file fisik
+    const copyFile = async (
+      sourceUrl: string,
+      targetDir: string,
+    ): Promise<string> => {
+      const fs = require('fs').promises;
+      const path = require('path');
+
+      const sourceAbsPath = urlToAbs(sourceUrl);
+      const filename = path.basename(sourceAbsPath);
+      const ext = path.extname(filename);
+      const nameWithoutExt = path.basename(filename, ext);
+      const timestamp = Date.now();
+      const random = Math.random().toString(36).substring(7);
+      const newFilename = `${nameWithoutExt}_copy_${timestamp}_${random}${ext}`;
+      const targetAbsPath = path.join(targetDir, newFilename);
+
+      // Ensure target directory exists
+      await fs.mkdir(targetDir, { recursive: true });
+
+      // Copy file
+      await fs.copyFile(sourceAbsPath, targetAbsPath);
+
+      // Convert back to URL (relative path)
+      return targetAbsPath.replace(/\\/g, '/');
+    };
+
+    try {
+      // ===== DUPLICATE SINGLE PRODUCT / SERVICE =====
+      if (isSingle) {
+        const duplicated = await this.prisma.$transaction(async (tx) => {
+          // 1) Copy images dari produk asli
+          const copiedImages: { url: string }[] = [];
+          if (existingProduct.productImage.length > 0) {
+            for (const img of existingProduct.productImage) {
+              try {
+                const newUrl = await copyFile(
+                  img.url,
+                  'upload/product/productImage',
+                );
+                copiedImages.push({ url: newUrl });
+              } catch (err) {
+                console.error('Failed to copy image:', err);
+                // Skip jika gagal copy gambar
+              }
+            }
+          }
+
+          // 2) Create produk baru dengan suffix "(Copy)"
+          const newProduct = await tx.product.create({
+            data: {
+              name: `${existingProduct.name} (Copy)`,
+              brand: existingProduct.brand,
+              description: existingProduct.description,
+              price: existingProduct.price,
+              salePrice: existingProduct.salePrice,
+              rating: existingProduct.rating,
+              isActive: false, // Set non-aktif by default
+              isHide: existingProduct.isHide,
+              index: existingProduct.index,
+              serviceType: existingProduct.serviceType,
+              ...(existingProduct.typeId
+                ? { type: { connect: { id: existingProduct.typeId } } }
+                : {}),
+              ...(existingProduct.modelId
+                ? { model: { connect: { id: existingProduct.modelId } } }
+                : {}),
+              ...(existingProduct.capacityId
+                ? { capacity: { connect: { id: existingProduct.capacityId } } }
+                : {}),
+              ...(existingProduct.categoryProductId
+                ? {
+                    categoryProduct: {
+                      connect: { id: existingProduct.categoryProductId },
+                    },
+                  }
+                : {}),
+              productImage: {
+                create: copiedImages,
+              },
+            },
+          });
+
+          // 3) Copy variants jika ada
+          if (existingProduct.productVariant.length > 0) {
+            for (const variant of existingProduct.productVariant) {
+              let copiedPhotoUrl: string | null = null;
+
+              // Copy variant photo
+              if (variant.photoUrl) {
+                try {
+                  copiedPhotoUrl = await copyFile(
+                    variant.photoUrl,
+                    'upload/product/variantImage',
+                  );
+                } catch (err) {
+                  console.error('Failed to copy variant image:', err);
+                }
+              }
+
+              await tx.productVariant.create({
+                data: {
+                  name: variant.name,
+                  code: variant.code,
+                  stock: variant.stock,
+                  regularPrice: variant.regularPrice,
+                  salePrice: variant.salePrice,
+                  specification: variant.specification,
+                  photoUrl: copiedPhotoUrl,
+                  index: variant.index,
+                  product: { connect: { id: newProduct.id } },
+                  ...(variant.capacityId
+                    ? { capacity: { connect: { id: variant.capacityId } } }
+                    : {}),
+                },
+              });
+            }
+          }
+
+          return tx.product.findUnique({
+            where: { id: newProduct.id },
+            include: {
+              productImage: true,
+              productVariant: true,
+              type: true,
+              model: true,
+              capacity: true,
+              categoryProduct: true,
+            },
+          });
+        });
+
+        return duplicated;
+      }
+
+      // ===== DUPLICATE BUNDLE =====
+      if (isBundle) {
+        const duplicated = await this.prisma.$transaction(async (tx) => {
+          // 1) Copy bundle images
+          const copiedImages: { url: string }[] = [];
+          if (existingBundle.bundleImage.length > 0) {
+            for (const img of existingBundle.bundleImage) {
+              try {
+                const newUrl = await copyFile(
+                  img.url,
+                  'upload/bundle/bundleImage',
+                );
+                copiedImages.push({ url: newUrl });
+              } catch (err) {
+                console.error('Failed to copy bundle image:', err);
+              }
+            }
+          }
+
+          // 2) Create bundle baru dengan suffix "(Copy)"
+          const newBundle = await tx.bundle.create({
+            data: {
+              name: `${existingBundle.name} (Copy)`,
+              description: existingBundle.description,
+              minusPrice: existingBundle.minusPrice,
+              price: existingBundle.price,
+              rating: existingBundle.rating,
+              isActive: false, // Set non-aktif by default
+              isHide: existingBundle.isHide,
+              index: existingBundle.index,
+              bundleImage: {
+                create: copiedImages,
+              },
+              items: {
+                createMany: {
+                  data: existingBundle.items.map((item) => ({
+                    productId: item.product.id,
+                  })),
+                },
+              },
+            },
+            include: {
+              bundleImage: true,
+              items: {
+                include: {
+                  product: {
+                    select: { uuid: true, name: true, price: true },
+                  },
+                },
+              },
+            },
+          });
+
+          return newBundle;
+        });
+
+        return duplicated;
+      }
+
+      throw new CustomError({
+        message: 'Tipe produk tidak valid',
+        statusCode: 400,
+      });
+    } catch (e) {
       throw e;
     }
   }

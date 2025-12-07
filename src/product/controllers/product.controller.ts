@@ -89,6 +89,21 @@ export class ProductController {
     }
   }
 
+  @UseGuards(JwtGuard, RoleGuard)
+  @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN)
+  @Post('product/duplicate/:uuid')
+  async duplicateProductByUuid(
+    @Param('uuid') uuid: string,
+    @Res() res: Response,
+  ) {
+    try {
+      const result = await this.productService.duplicateProductByUuid(uuid);
+      return formatResponse(res, HttpStatus.OK, result);
+    } catch (error) {
+      errorHandler(res, error);
+    }
+  }
+
   @Delete('product/variant')
   async async(@Body() dto: RemoveVariantDto, @Res() res: Response) {
     try {
