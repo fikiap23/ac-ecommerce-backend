@@ -163,7 +163,7 @@ export class OrderValidateRepository {
   async validateProductsWithVariants(
     carts: {
       productUuid?: string;
-      productVariantUuid?: string; // boleh kosong utk SERVICE
+      productVariantUuid?: string;
       quantity: number;
     }[],
     products: (Product & { productVariant: ProductVariant[] })[],
@@ -184,26 +184,15 @@ export class OrderValidateRepository {
         });
       }
 
-      const serviceType = String(
-        (product as any).serviceType || '',
-      ).toUpperCase();
-      const isProductType = serviceType === 'PRODUCT';
-
-      if (isProductType) {
-        if (!cart.productVariantUuid) {
-          throw new CustomError({
-            message: `Varian wajib dipilih untuk produk ${product.name}`,
-            statusCode: 400,
-          });
-        }
-
+      // Jika ada productVariantUuid, berarti pakai variant (baik PRODUCT maupun SERVICE)
+      if (cart.productVariantUuid) {
         const variant = product.productVariant.find(
           (v) => v.uuid === cart.productVariantUuid,
         );
 
         if (!variant) {
           throw new CustomError({
-            message: `Varian produk tidak ditemukan untuk produk ${product.name}`,
+            message: `Varian tidak ditemukan untuk ${product.name}`,
             statusCode: 404,
           });
         }
@@ -221,6 +210,7 @@ export class OrderValidateRepository {
           quantity: cart.quantity,
         });
       } else {
+        // Tidak ada variant
         validatedItems.push({
           product,
           variant: null,

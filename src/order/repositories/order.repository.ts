@@ -50,24 +50,15 @@ export class OrderRepository {
         });
       }
 
-      const isProductType = product.serviceType === 'PRODUCT';
-
-      if (isProductType) {
-        // Wajib ada variant utk PRODUCT
-        if (!cartItem.productVariantUuid) {
-          throw new CustomError({
-            message: `Varian wajib dipilih untuk produk ${product.name}`,
-            statusCode: 400,
-          });
-        }
-
+      // Jika ada variant (baik PRODUCT maupun SERVICE)
+      if (cartItem.productVariantUuid) {
         const variant = product.productVariant.find(
           (v) => v.uuid === cartItem.productVariantUuid,
         );
 
         if (!variant) {
           throw new CustomError({
-            message: `Varian produk tidak ditemukan untuk produk ${product.name}`,
+            message: `Varian tidak ditemukan untuk ${product.name}`,
             statusCode: 404,
           });
         }
@@ -82,15 +73,13 @@ export class OrderRepository {
         }
 
         totalAmount += Number(priceToUse) * cartItem.quantity;
-        console.log('PRODUCT');
-        console.log(totalAmount);
-        console.log(variant.salePrice, variant.regularPrice);
       } else {
+        // Tidak ada variant
         const priceToUse = product.salePrice ?? product.price;
 
         if (priceToUse == null || Number.isNaN(Number(priceToUse))) {
           throw new CustomError({
-            message: `Harga produk layanan ${product.name} tidak valid`,
+            message: `Harga ${product.name} tidak valid`,
             statusCode: 400,
           });
         }

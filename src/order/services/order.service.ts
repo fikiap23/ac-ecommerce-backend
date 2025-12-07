@@ -330,8 +330,6 @@ export class OrderService {
         ],
       });
 
-      // Order items harus mengikuti carts
-      // Definisikan tipe item xendit (atau import dari SDK kamu kalau ada)
       type XenditOrderItem = {
         type: 'PHYSICAL_PRODUCT';
         reference_id: string;
@@ -354,16 +352,15 @@ export class OrderService {
             });
           }
 
-          const isProductType =
-            String(p.serviceType).toUpperCase() === 'PRODUCT';
           let name = String(p.name ?? 'Produk');
           let priceNum: number;
 
-          if (isProductType) {
+          // Cek apakah ada variant (baik PRODUCT maupun SERVICE)
+          if (ci.productVariantUuid) {
             const variant = pickVariant(p, ci.productVariantUuid);
             if (!variant) {
               throw new CustomError({
-                message: `Varian produk tidak ditemukan untuk ${String(
+                message: `Varian tidak ditemukan untuk ${String(
                   p.name ?? '(tanpa nama)',
                 )}`,
                 statusCode: 404,
@@ -372,22 +369,19 @@ export class OrderService {
             priceNum = Number(variant.salePrice ?? variant.regularPrice);
             name = `${name} - ${String(variant.name ?? '')}`;
           } else {
+            // Tidak ada variant
             priceNum = Number(p.salePrice ?? p.price);
           }
 
           if (!Number.isFinite(priceNum)) {
             throw new CustomError({
-              message: isProductType
-                ? `Harga varian ${String(p.name ?? '(tanpa nama)')} tidak valid`
-                : `Harga layanan ${String(
-                    p.name ?? '(tanpa nama)',
-                  )} tidak valid`,
+              message: `Harga ${String(p.name ?? '(tanpa nama)')} tidak valid`,
               statusCode: 400,
             });
           }
 
           return {
-            type: 'PHYSICAL_PRODUCT', // literal terkunci
+            type: 'PHYSICAL_PRODUCT',
             reference_id: String(p.uuid),
             name,
             net_unit_amount: priceNum,
@@ -450,7 +444,6 @@ export class OrderService {
             recipientAddress: { create: dto.recipientAddress },
           }),
 
-          // Penting: create berdasarkan DTO CARTS (bukan products.map)
           orderProduct: {
             create: carts.map((ci) => {
               const p = productByUuid.get(ci.productUuid);
@@ -461,30 +454,27 @@ export class OrderService {
                 });
               }
 
-              const isProductType =
-                String(p.serviceType).toUpperCase() === 'PRODUCT';
-              const variant = isProductType
+              // Cek apakah ada variant (baik PRODUCT maupun SERVICE)
+              const variant = ci.productVariantUuid
                 ? pickVariant(p, ci.productVariantUuid)
                 : undefined;
 
-              if (isProductType && !variant) {
+              if (ci.productVariantUuid && !variant) {
                 throw new CustomError({
-                  message: `Varian produk tidak ditemukan untuk produk ${
+                  message: `Varian tidak ditemukan untuk ${
                     p.name ?? '(tanpa nama)'
                   }`,
                   statusCode: 404,
                 });
               }
 
-              const price = isProductType
-                ? variant!.salePrice ?? variant!.regularPrice
+              const price = variant
+                ? variant.salePrice ?? variant.regularPrice
                 : p.salePrice ?? p.price;
 
               if (price == null || Number.isNaN(Number(price))) {
                 throw new CustomError({
-                  message: isProductType
-                    ? `Harga varian ${p.name ?? '(tanpa nama)'} tidak valid`
-                    : `Harga layanan ${p.name ?? '(tanpa nama)'} tidak valid`,
+                  message: `Harga ${p.name ?? '(tanpa nama)'} tidak valid`,
                   statusCode: 400,
                 });
               }
@@ -504,17 +494,14 @@ export class OrderService {
                 capacity: capacityName,
                 price: Number(price),
 
-                // Produk atomik tetap SINGLE (ikut katalog)
                 packageType: p.packageType,
                 serviceType: p.serviceType,
 
                 category: categoryName,
                 orderProductId: p.id,
-                orderProductVariantId: isProductType ? variant!.id : undefined,
+                orderProductVariantId: variant?.id ?? undefined,
                 orderProductUuid: ci.productUuid,
-                orderProductVariantUuid: isProductType
-                  ? ci.productVariantUuid
-                  : undefined,
+                orderProductVariantUuid: ci.productVariantUuid ?? undefined,
                 quantity: ci.quantity,
                 discount: 0,
 
@@ -528,7 +515,7 @@ export class OrderService {
                 variantName: ci.variantName ?? null,
                 variantImage: ci.variantImage ?? null,
 
-                // bunde
+                // bundle
                 sourcePackageType: ci.sourcePackageType ?? 'SINGLE',
                 bundleGroupId: ci.bundleGroupId ?? null,
                 bundleName: ci.bundleName ?? null,
@@ -612,7 +599,7 @@ export class OrderService {
           continue;
         }
 
-        // kalau cuma product biasa
+        // kalau cuma product/service biasa
         const product = item.productVariant?.product ?? item.product;
         if (product?.uuid) {
           await tx.product.update({
@@ -629,7 +616,7 @@ export class OrderService {
       return createdOrder;
     });
 
-    // === Email invoice: ikut DTO CARTS juga ===
+    // === Email invoice ===
     await this.mailService.sendInvoice({
       subject: '[G-Solusi] Menunggu Pembayaran - Pesanan Anda',
       title: 'Selesaikan Pesanan Anda',
@@ -655,21 +642,12 @@ export class OrderService {
             });
           }
 
-          const isProductType =
-            String(p.serviceType).toUpperCase() === 'PRODUCT';
-
-          if (isProductType) {
-            if (!ci.productVariantUuid) {
-              throw new CustomError({
-                message: `Varian wajib dipilih untuk produk ${p.name}`,
-                statusCode: 400,
-              });
-            }
-
+          // Jika ada variant (baik PRODUCT maupun SERVICE)
+          if (ci.productVariantUuid) {
             const variant = pickVariant(p, ci.productVariantUuid);
             if (!variant) {
               throw new CustomError({
-                message: `Varian produk tidak ditemukan untuk produk ${p.name}`,
+                message: `Varian tidak ditemukan untuk ${p.name}`,
                 statusCode: 404,
               });
             }
@@ -690,10 +668,11 @@ export class OrderService {
             };
           }
 
+          // Tidak ada variant
           const priceNum = p.salePrice ?? p.price;
           if (priceNum == null || Number.isNaN(Number(priceNum))) {
             throw new CustomError({
-              message: `Harga layanan ${p.name ?? '(tanpa nama)'} tidak valid`,
+              message: `Harga ${p.name ?? '(tanpa nama)'} tidak valid`,
               statusCode: 400,
             });
           }
