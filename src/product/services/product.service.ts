@@ -124,6 +124,7 @@ export class ProductService {
       productImageRows = savedProductImages.map((s) => ({ url: s.url }));
       allAbsToCleanup.push(...savedProductImages.map((s) => s.absPath));
 
+      // simpan gambar variant (untuk PRODUCT dan SERVICE)
       const savedVariantImages = await Promise.all(
         variantImages.map((imgs) =>
           saveImages(imgs, 'upload/product/variantImage', 'Variant Image'),
@@ -150,35 +151,7 @@ export class ProductService {
     try {
       switch (packageType) {
         case 'SINGLE': {
-          if (serviceType === 'SERVICE') {
-            const created = await this.prisma.$transaction(async (tx) => {
-              return tx.product.create({
-                data: {
-                  name: dto.name,
-                  description: dto.description,
-                  brand: dto.brand,
-                  price: dto.price,
-                  salePrice: dto.salePrice ?? null,
-                  packageType,
-                  serviceType,
-                  isActive: parseFormBoolean(dto.isActive),
-                  isHide: parseFormBoolean(dto.isHide),
-                  index: Number(dto.index),
-                  rating: parseFloat(dto.rating ?? '0'),
-                  type: typeConnect,
-                  model: modelConnect,
-                  capacity: capacityConnect,
-                  categoryProduct: categoryProductConnect,
-                  productImage:
-                    (productImageRows?.length ?? 0) > 0
-                      ? { create: productImageRows }
-                      : undefined,
-                },
-              });
-            });
-            return created;
-          }
-
+          // SERVICE dan PRODUCT sekarang punya logic yang sama
           const created = await this.prisma.$transaction(async (tx) => {
             return tx.product.create({
               data: {
@@ -500,7 +473,7 @@ export class ProductService {
       allAbsToCleanup.push(...saved.map((s) => s.absPath));
     }
 
-    // Varian (SINGLE PRODUCT): proses per varian
+    // Varian (SINGLE PRODUCT/SERVICE): proses per varian
     type VariantUpdatePlan = {
       kind: 'create' | 'update';
       uuid?: string;
@@ -514,10 +487,8 @@ export class ProductService {
     const variantPlans: VariantUpdatePlan[] = [];
 
     if (isSingle) {
-      const targetServiceType = dto.serviceType ?? existingProduct!.serviceType;
-      const isService = targetServiceType === 'SERVICE';
-
-      if (!isService && Array.isArray(dto.variants) && dto.variants.length) {
+      // SERVICE dan PRODUCT sekarang bisa sama-sama punya variant
+      if (Array.isArray(dto.variants) && dto.variants.length) {
         // Map existing variants by uuid untuk lookup cepat
         const existingByUuid = new Map<string, ProductVariant>();
         existingProduct!.productVariant.forEach((pv) =>
@@ -817,6 +788,7 @@ export class ProductService {
               isActive: false, // Set non-aktif by default
               isHide: existingProduct.isHide,
               index: existingProduct.index,
+              packageType: existingProduct.packageType, // Tambahkan packageType
               serviceType: existingProduct.serviceType,
               ...(existingProduct.typeId
                 ? { type: { connect: { id: existingProduct.typeId } } }
