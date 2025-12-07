@@ -79,7 +79,7 @@ export class ProductQuery extends PrismaService {
 
     // get product + bundle
     const bundlePromise =
-      filter?.serviceType === 'PRODUCT'
+      filter?.serviceType !== 'SERVICE'
         ? prisma.bundle.findMany({
             where: {
               deletedAt: null,

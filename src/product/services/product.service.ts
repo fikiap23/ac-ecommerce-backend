@@ -6,10 +6,7 @@ import {
   ReorderCatalogDto,
   UpdateProductDto,
 } from '../dto/product.dto';
-import {
-  IFilterProduct,
-  ISelectGeneralProduct,
-} from '../interfaces/product.interface';
+import { IFilterProduct } from '../interfaces/product.interface';
 import { CategoryProductRepository } from '../repositories/category-product.repository';
 import { Prisma, ProductVariant } from '@prisma/client';
 import {
@@ -23,7 +20,6 @@ import { CapacityRepository } from '../repositories/capacity.repository';
 import { TypeRepository } from '../repositories/type.repository';
 import {
   assertImages,
-  copyFile,
   deleteFilesBestEffort,
   saveImages,
   urlToAbs,
@@ -800,53 +796,14 @@ export class ProductService {
     const isSingle = !!existingProduct;
     const isBundle = !!existingBundle;
 
-    // Helper function untuk copy file fisik
-    const copyFile = async (
-      sourceUrl: string,
-      targetDir: string,
-    ): Promise<string> => {
-      const fs = require('fs').promises;
-      const path = require('path');
-
-      const sourceAbsPath = urlToAbs(sourceUrl);
-      const filename = path.basename(sourceAbsPath);
-      const ext = path.extname(filename);
-      const nameWithoutExt = path.basename(filename, ext);
-      const timestamp = Date.now();
-      const random = Math.random().toString(36).substring(7);
-      const newFilename = `${nameWithoutExt}_copy_${timestamp}_${random}${ext}`;
-      const targetAbsPath = path.join(targetDir, newFilename);
-
-      // Ensure target directory exists
-      await fs.mkdir(targetDir, { recursive: true });
-
-      // Copy file
-      await fs.copyFile(sourceAbsPath, targetAbsPath);
-
-      // Convert back to URL (relative path)
-      return targetAbsPath.replace(/\\/g, '/');
-    };
-
     try {
       // ===== DUPLICATE SINGLE PRODUCT / SERVICE =====
       if (isSingle) {
         const duplicated = await this.prisma.$transaction(async (tx) => {
-          // 1) Copy images dari produk asli
-          const copiedImages: { url: string }[] = [];
-          if (existingProduct.productImage.length > 0) {
-            for (const img of existingProduct.productImage) {
-              try {
-                const newUrl = await copyFile(
-                  img.url,
-                  'upload/product/productImage',
-                );
-                copiedImages.push({ url: newUrl });
-              } catch (err) {
-                console.error('Failed to copy image:', err);
-                // Skip jika gagal copy gambar
-              }
-            }
-          }
+          // 1) Ambil images dari produk asli (gunakan URL yang sama)
+          const copiedImages = existingProduct.productImage.map((img) => ({
+            url: img.url,
+          }));
 
           // 2) Create produk baru dengan suffix "(Copy)"
           const newProduct = await tx.product.create({
@@ -886,20 +843,6 @@ export class ProductService {
           // 3) Copy variants jika ada
           if (existingProduct.productVariant.length > 0) {
             for (const variant of existingProduct.productVariant) {
-              let copiedPhotoUrl: string | null = null;
-
-              // Copy variant photo
-              if (variant.photoUrl) {
-                try {
-                  copiedPhotoUrl = await copyFile(
-                    variant.photoUrl,
-                    'upload/product/variantImage',
-                  );
-                } catch (err) {
-                  console.error('Failed to copy variant image:', err);
-                }
-              }
-
               await tx.productVariant.create({
                 data: {
                   name: variant.name,
@@ -908,7 +851,7 @@ export class ProductService {
                   regularPrice: variant.regularPrice,
                   salePrice: variant.salePrice,
                   specification: variant.specification,
-                  photoUrl: copiedPhotoUrl,
+                  photoUrl: variant.photoUrl, // Gunakan URL yang sama
                   index: variant.index,
                   product: { connect: { id: newProduct.id } },
                   ...(variant.capacityId
@@ -938,21 +881,10 @@ export class ProductService {
       // ===== DUPLICATE BUNDLE =====
       if (isBundle) {
         const duplicated = await this.prisma.$transaction(async (tx) => {
-          // 1) Copy bundle images
-          const copiedImages: { url: string }[] = [];
-          if (existingBundle.bundleImage.length > 0) {
-            for (const img of existingBundle.bundleImage) {
-              try {
-                const newUrl = await copyFile(
-                  img.url,
-                  'upload/bundle/bundleImage',
-                );
-                copiedImages.push({ url: newUrl });
-              } catch (err) {
-                console.error('Failed to copy bundle image:', err);
-              }
-            }
-          }
+          // 1) Ambil bundle images (gunakan URL yang sama)
+          const copiedImages = existingBundle.bundleImage.map((img) => ({
+            url: img.url,
+          }));
 
           // 2) Create bundle baru dengan suffix "(Copy)"
           const newBundle = await tx.bundle.create({
