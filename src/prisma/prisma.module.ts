@@ -26,6 +26,7 @@ import { BundleQuery } from './queries/bundle/bundle.query';
 import { SiteSettingQuery } from './queries/setting/site-setting.query';
 import { SettingSocialQuery } from './queries/setting/setting-social.query';
 import { MessageQuery } from './queries/message/message.query';
+import { GalleryQuery } from './queries/gallery/gallery.query';
 
 @Module({
   imports: [],
@@ -57,6 +58,7 @@ import { MessageQuery } from './queries/message/message.query';
     SiteSettingQuery,
     SettingSocialQuery,
     MessageQuery,
+    GalleryQuery,
   ],
   exports: [
     PrismaService,
@@ -86,6 +88,7 @@ import { MessageQuery } from './queries/message/message.query';
     SiteSettingQuery,
     SettingSocialQuery,
     MessageQuery,
+    GalleryQuery,
   ],
 })
 export class PrismaModule {}

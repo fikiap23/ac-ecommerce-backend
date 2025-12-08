@@ -17,6 +17,7 @@ import { DriverModule } from './driver/driver.module';
 import { TechnicianModule } from './technician/technician.module';
 import { SettingModule } from './setting/setting.module';
 import { MessageModule } from './message/message.module';
+import { GalleryModule } from './gallery/gallery.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { MessageModule } from './message/message.module';
     TechnicianModule,
     SettingModule,
     MessageModule,
+    GalleryModule,
   ],
 })
 export class AppModule implements NestModule {
