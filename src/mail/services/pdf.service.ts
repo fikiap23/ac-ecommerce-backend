@@ -18,7 +18,7 @@ export class PdfService {
     const pageWidth = doc.internal.pageSize.getWidth();
 
     // ganti headerUrlnya
-    const headerUrl = 'https://api.gsolusi.id/upload/asset/g-solusi-header.png';
+    const headerUrl = 'https://gsolusi.id/images/email/header.png';
 
     try {
       const headerBase64 = await this.loadImageAsBase64(headerUrl);
