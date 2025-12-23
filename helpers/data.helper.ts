@@ -150,3 +150,14 @@ export const filterOrderProduct = (
 
   return result;
 };
+
+export const toNumberOrNull = (value?: string | null) => {
+  if (value === null || value === 'null') {
+    return null;
+  } else if (value === undefined || value === 'undefined') {
+    return undefined;
+  }
+
+  const n = Number(value);
+  return Number.isNaN(n) ? null : n;
+};

@@ -111,8 +111,7 @@ export class CreateProductDto {
   rating: string;
 
   @IsOptional()
-  @IsNumber()
-  salePrice?: number;
+  salePrice?: string;
 
   @IsString()
   @IsOptional()

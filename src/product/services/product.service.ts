@@ -24,7 +24,7 @@ import {
   saveImages,
   urlToAbs,
 } from 'helpers/helper';
-import { parseFormBoolean } from 'helpers/data.helper';
+import { parseFormBoolean, toNumberOrNull } from 'helpers/data.helper';
 
 @Injectable()
 export class ProductService {
@@ -159,7 +159,8 @@ export class ProductService {
                 brand: dto.brand,
                 description: dto.description,
                 price: dto.price,
-                salePrice: dto.salePrice ?? null,
+                salePrice: toNumberOrNull(dto.salePrice),
+
                 packageType,
                 serviceType,
                 isActive: parseFormBoolean(dto.isActive),
@@ -581,7 +582,7 @@ export class ProductService {
             brand: dto.brand ?? undefined,
             description: dto.description ?? undefined,
             price: dto.price ?? undefined,
-            salePrice: dto.salePrice ?? undefined,
+            salePrice: toNumberOrNull(dto.salePrice),
             rating: parseFloat(dto.rating ?? '0'),
             isActive: parseFormBoolean(dto.isActive),
             isHide: parseFormBoolean(dto.isHide),
