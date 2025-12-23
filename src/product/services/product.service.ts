@@ -183,7 +183,7 @@ export class ProductService {
                           code: v.code,
                           stock: v.stock,
                           regularPrice: v.regularPrice,
-                          salePrice: v.salePrice ?? null,
+                          salePrice: toNumberOrNull(v.salePrice),
                           specification: v.specification ?? null,
                           photoUrl: variantPhotoUrls?.[idx] || null,
                           index: v.index,

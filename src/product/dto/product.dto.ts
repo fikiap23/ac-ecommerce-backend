@@ -37,8 +37,7 @@ export class CreateProductVariantDto {
   regularPrice: number;
 
   @IsOptional()
-  @IsNumber()
-  salePrice?: number;
+  salePrice?: string;
 
   @IsOptional()
   @IsString()
