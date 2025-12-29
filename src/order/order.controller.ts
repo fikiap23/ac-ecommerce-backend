@@ -237,6 +237,19 @@ export class OrderController {
     }
   }
 
+  @Post('order-va-create')
+  async orderVaCreate(
+    @Headers('X-CALLBACK-TOKEN') token: string,
+    @Body() dto: IOrderPayment,
+    @Res() res: Response,
+  ) {
+    try {
+      console.log('Va create from Xendit:', dto);
+    } catch (error) {
+      errorHandler(res, error);
+    }
+  }
+
   @UseGuards(JwtGuard, RoleGuard)
   @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN)
   @Get('order-summary')
