@@ -124,7 +124,11 @@ export class CreateProductDto {
   @IsNumber()
   index?: number;
 
-  @ValidateIf((o) => o.serviceType === TypeProductService.PRODUCT)
+  @ValidateIf(
+    (o) =>
+      o.serviceType === TypeProductService.PRODUCT &&
+      o.packageType !== TypeProductPackage.BUNDLE,
+  )
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

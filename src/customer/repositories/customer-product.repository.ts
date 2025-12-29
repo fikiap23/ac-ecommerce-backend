@@ -26,7 +26,7 @@ export class CustomerProductRepository {
     return await this.customerProductQuery.create({ tx, data });
   }
 
-  async getMany({
+  async getMany<T extends Prisma.CustomerProductSelect>({
     tx,
     where,
     select,
@@ -34,15 +34,17 @@ export class CustomerProductRepository {
   }: {
     tx?: Prisma.TransactionClient;
     where?: Prisma.CustomerProductWhereInput;
-    select?: Prisma.CustomerProductSelect;
+    select?: T;
     orderBy?: Prisma.CustomerProductOrderByWithRelationInput;
   }) {
-    return await this.customerProductQuery.findMany({
+    return (await this.customerProductQuery.findMany({
       tx,
       where,
       select,
       orderBy,
-    });
+    })) as unknown as Promise<
+      Prisma.CustomerProductGetPayload<{ select: T }>[]
+    >;
   }
 
   async getThrowByUuid({

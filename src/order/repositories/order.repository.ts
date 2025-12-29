@@ -312,14 +312,14 @@ export class OrderRepository {
     return result;
   }
 
-  async getThrowByUuid({
+  async getThrowByUuid<T extends Prisma.OrderSelect>({
     tx,
     uuid,
     select,
   }: {
     tx?: Prisma.TransactionClient;
     uuid: string;
-    select?: Prisma.OrderSelect;
+    select?: T;
   }) {
     const result = await this.orderQuery.findByUuid({
       tx,
@@ -334,7 +334,7 @@ export class OrderRepository {
       });
     }
 
-    return result;
+    return result as unknown as Promise<Prisma.OrderGetPayload<{ select: T }>>;
   }
 
   async getThrowByUuidAndCustomerId({

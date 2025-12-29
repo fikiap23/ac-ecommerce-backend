@@ -575,40 +575,6 @@ export class OrderService {
         });
       }
 
-      for (const item of cart as any[]) {
-        const qty = item.quantity ?? 1;
-
-        // kalau ada bundle
-        if (item.bundle) {
-          await tx.bundle.update({
-            where: { uuid: item.bundle.uuid },
-            data: { countTotalSale: { increment: qty } },
-          });
-
-          // update semua product dalam bundle
-          for (const pb of item.customerProductBundle ?? []) {
-            const product = pb.product ?? pb.productVariant?.product;
-            if (product?.uuid) {
-              await tx.product.update({
-                where: { uuid: product.uuid },
-                data: { countTotalSale: { increment: qty } },
-              });
-            }
-          }
-
-          continue;
-        }
-
-        // kalau cuma product/service biasa
-        const product = item.productVariant?.product ?? item.product;
-        if (product?.uuid) {
-          await tx.product.update({
-            where: { uuid: product.uuid },
-            data: { countTotalSale: { increment: qty } },
-          });
-        }
-      }
-
       await tx.customerProduct.deleteMany({
         where: { uuid: { in: dto.carts.map((c) => c.cartUuid) } },
       });
@@ -1218,8 +1184,28 @@ export class OrderService {
         select: {
           id: true,
           evidencePaymentImages: true,
+          evidenceNotes: true,
           orderProduct: {
-            select: { id: true, uuid: true, deviceId: true, serviceType: true },
+            select: {
+              id: true,
+              uuid: true,
+
+              // device rules
+              deviceId: true,
+              serviceType: true,
+
+              quantity: true,
+
+              // bundle
+              bundleGroupId: true,
+
+              // variant
+              variantUuid: true,
+              orderProductVariantUuid: true,
+
+              // product
+              orderProductUuid: true,
+            },
           },
         },
         tx,
@@ -1265,6 +1251,45 @@ export class OrderService {
               uuid: op.uuid,
               data: { isDeviceOutside: hasUsed ? false : true },
               tx,
+            });
+          }
+        }
+
+        // ================================
+        // UPDATE COUNT TOTAL SALE
+        // ================================
+        const processedBundle = new Set<string>();
+
+        for (const item of order.orderProduct) {
+          const qty = item.quantity ?? 1;
+
+          // ================================
+          // 1. BUNDLE
+          // ================================
+          if (item.bundleGroupId) {
+            if (processedBundle.has(item.bundleGroupId)) continue;
+
+            processedBundle.add(item.bundleGroupId);
+
+            await tx.bundle.update({
+              where: { uuid: item.bundleGroupId },
+              data: {
+                countTotalSale: { increment: qty },
+              },
+            });
+
+            continue;
+          }
+
+          // ================================
+          // 2. PRODUCT BIASA
+          // ================================
+          if (item.orderProductUuid) {
+            await tx.product.update({
+              where: { uuid: item.orderProductUuid },
+              data: {
+                countTotalSale: { increment: qty },
+              },
             });
           }
         }
