@@ -575,6 +575,19 @@ export class OrderService {
         });
       }
 
+      for (const item of cart) {
+        const qty = item.quantity ?? 1;
+
+        // update stock
+        const productVariant = item?.productVariant;
+        if (productVariant) {
+          await tx.productVariant.update({
+            where: { uuid: productVariant.uuid },
+            data: { stock: { decrement: qty } },
+          });
+        }
+      }
+
       await tx.customerProduct.deleteMany({
         where: { uuid: { in: dto.carts.map((c) => c.cartUuid) } },
       });
@@ -685,6 +698,7 @@ export class OrderService {
           expiredAt: null,
         },
       });
+      await this.restoreOrderStock(order.id);
 
       if (order.voucherId) {
         await this.voucherRepository.updateById({
@@ -735,6 +749,7 @@ export class OrderService {
           expiredAt: null,
         },
       });
+      await this.restoreOrderStock(order.id);
 
       if (order.voucherId) {
         await this.voucherRepository.updateById({
@@ -854,6 +869,7 @@ export class OrderService {
           expiredAt: null,
         },
       });
+      await this.restoreOrderStock(order.id);
 
       throw new CustomError({
         message: 'Order Expired',
@@ -937,6 +953,7 @@ export class OrderService {
         expiredAt: null,
       },
     });
+    await this.restoreOrderStock(order.id);
     if (order.voucherId) {
       await this.voucherRepository.updateById({
         id: order.voucherId,
@@ -967,15 +984,6 @@ export class OrderService {
       select: selectGeneralListOrders,
     });
 
-    const statusMap: Record<
-      'Delivered' | 'Shipped' | 'Packed',
-      TypeStatusOrder
-    > = {
-      Delivered: TypeStatusOrder.DELIVERED,
-      Shipped: TypeStatusOrder.SHIPPED,
-      Packed: TypeStatusOrder.PACKED,
-    };
-
     await Promise.all(
       orders.data.map(async (order: ISelectGeneralListOrder) => {
         if (
@@ -990,6 +998,7 @@ export class OrderService {
               expiredAt: null,
             },
           });
+          await this.restoreOrderStock(order.id);
 
           if (order.voucherId) {
             await this.voucherRepository.updateById({
@@ -1128,6 +1137,7 @@ export class OrderService {
           expiredAt: null,
         },
       });
+      await this.restoreOrderStock(order.id);
 
       if (order.voucherId) {
         await this.voucherRepository.updateById({
@@ -1614,6 +1624,36 @@ export class OrderService {
       },
       select: selectOrderProductDevice,
     });
+  }
+
+  async restoreOrderStock(orderId: number) {
+    const items = await this.prismaService.orderProduct.findMany({
+      where: { orderId },
+      select: {
+        quantity: true,
+        variantUuid: true,
+        orderProductVariantUuid: true,
+        orderProductUuid: true,
+      },
+    });
+
+    for (const item of items) {
+      const qty = item.quantity ?? 1;
+
+      // VARIANT
+      if (item.variantUuid || item.orderProductVariantUuid) {
+        const variantUuid = item.variantUuid ?? item.orderProductVariantUuid;
+
+        await this.prismaService.productVariant.update({
+          where: { uuid: variantUuid },
+          data: {
+            stock: { increment: qty },
+          },
+        });
+
+        continue;
+      }
+    }
   }
 
   async getSummary(filter: IFilterReportSummary) {

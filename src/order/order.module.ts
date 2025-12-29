@@ -52,6 +52,7 @@ import { DriverModule } from 'src/driver/driver.module';
     OrderRepository,
     OrderCallbackPaymentRepository,
     OrderProductRepository,
+    OrderService,
   ],
 })
 export class OrderModule {}

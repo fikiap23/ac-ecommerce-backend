@@ -12,6 +12,7 @@ import { VoucherRepository } from 'src/voucher/repositories/voucher.repository';
 import { GatewayXenditRepository } from 'src/gateway/repositories/gateway-xendit.repository';
 import { OrderCallbackPaymentRepository } from 'src/order/repositories/order-callback-payment.repository';
 import { TypeStatusOrder } from '@prisma/client';
+import { OrderService } from 'src/order/services/order.service';
 
 @Injectable()
 export class CustomerOrderService {
@@ -20,6 +21,7 @@ export class CustomerOrderService {
     private readonly customerOrderRepository: CustomerOrderRepository,
     private readonly gatewayService: GatewayService,
     private readonly orderRepository: OrderRepository,
+    private readonly orderService: OrderService,
     private readonly voucherRepository: VoucherRepository,
     private readonly gatewayXenditRepository: GatewayXenditRepository,
     private readonly orderCallbackPaymentRepository: OrderCallbackPaymentRepository,
@@ -76,6 +78,7 @@ export class CustomerOrderService {
 
           order.status = TypeStatusOrder.CANCELLED;
           order.expiredAt = null;
+          await this.orderService.restoreOrderStock(order.id);
         }
       }),
     );
