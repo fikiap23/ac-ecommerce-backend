@@ -245,6 +245,7 @@ export class OrderController {
   ) {
     try {
       console.log('Va create from Xendit:', dto);
+      return formatResponse(res, HttpStatus.OK, null);
     } catch (error) {
       errorHandler(res, error);
     }
