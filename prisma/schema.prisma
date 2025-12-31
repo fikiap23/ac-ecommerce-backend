@@ -431,6 +431,7 @@ model Order {
   netAmount             Int?            @default(0)
   discountBundle        Int?            @default(0)
   isNetAmountCalculated Boolean?        @default(false)
+  isRead                Boolean         @default(false)
   customerId            Int?
   voucherId             Int?
   status                TypeStatusOrder @default(WAITING_PAYMENT)

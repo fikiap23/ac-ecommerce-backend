@@ -142,6 +142,19 @@ export class OrderQuery extends PrismaService {
     return await prisma.order.update({ where, data });
   }
 
+  async updateMany({
+    tx,
+    where,
+    data,
+  }: {
+    tx?: Prisma.TransactionClient;
+    where: Prisma.OrderWhereInput;
+    data: Prisma.OrderUpdateManyMutationInput;
+  }) {
+    const prisma = tx ?? this;
+    return await prisma.order.updateMany({ where, data });
+  }
+
   async count({
     tx,
     where,

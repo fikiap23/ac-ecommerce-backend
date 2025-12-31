@@ -1656,6 +1656,21 @@ export class OrderService {
     }
   }
 
+  async getCountUnreadOrder() {
+    const count = await this.orderRepository.count({
+      where: { isRead: false },
+    });
+
+    return { unread: count };
+  }
+
+  async readAllOrder() {
+    await this.orderRepository.updateMany({
+      where: { isRead: false },
+      data: { isRead: true },
+    });
+  }
+
   async getSummary(filter: IFilterReportSummary) {
     const balance = await this.orderRepository.aggregate({
       _sum: {

@@ -155,6 +155,18 @@ export class OrderController {
 
   @UseGuards(JwtGuard, RoleGuard)
   @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN)
+  @Patch('order/notif/read/all')
+  async readAllNotification(@Res() res: Response) {
+    try {
+      await this.orderService.readAllOrder();
+      return formatResponse(res, HttpStatus.OK, null);
+    } catch (error) {
+      errorHandler(res, error);
+    }
+  }
+
+  @UseGuards(JwtGuard, RoleGuard)
+  @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN)
   @Get('order')
   async getAllOrders(@Query() queries: QueryOrderDto, @Res() res: Response) {
     try {
@@ -330,6 +342,19 @@ export class OrderController {
       }
 
       const result = await this.orderService.getManyDeviceById(sub, id);
+
+      return formatResponse(res, HttpStatus.OK, result);
+    } catch (error) {
+      return errorHandler(res, error);
+    }
+  }
+
+  @UseGuards(JwtGuard, RoleGuard)
+  @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN)
+  @Get('order/notif/unread')
+  async getCountUnreadOrder(@Res() res: Response) {
+    try {
+      const result = await this.orderService.getCountUnreadOrder();
 
       return formatResponse(res, HttpStatus.OK, result);
     } catch (error) {

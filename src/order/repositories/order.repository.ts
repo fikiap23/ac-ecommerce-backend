@@ -26,6 +26,18 @@ export class OrderRepository {
     |--------------------------------------------------------------------------
     */
 
+  async updateMany({
+    tx,
+    where,
+    data,
+  }: {
+    tx?: Prisma.TransactionClient;
+    where: Prisma.OrderWhereInput;
+    data: Prisma.OrderUpdateManyMutationInput;
+  }) {
+    return await this.orderQuery.updateMany({ tx, where, data });
+  }
+
   async calculateTotalAmount(
     carts: CartItemProductDto[],
     products: (ISelectProductForCreateOrder & {
