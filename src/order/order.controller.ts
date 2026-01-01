@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Headers,
   HttpStatus,
   Param,
@@ -167,6 +168,8 @@ export class OrderController {
 
   @UseGuards(JwtGuard, RoleGuard)
   @Roles(TypeRoleAdmin.ADMIN, TypeRoleAdmin.SUPER_ADMIN)
+  @Header('Cache-Control', 'no-store')
+  @Header('Pragma', 'no-cache')
   @Get('order')
   async getAllOrders(@Query() queries: QueryOrderDto, @Res() res: Response) {
     try {
