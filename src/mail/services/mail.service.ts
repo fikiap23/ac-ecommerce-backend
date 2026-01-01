@@ -34,6 +34,7 @@ export class MailService {
             }),
           ),
         },
+        year: new Date().getFullYear(),
       },
       attachments: [
         {
