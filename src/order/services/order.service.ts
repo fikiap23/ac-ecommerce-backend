@@ -789,87 +789,79 @@ export class OrderService {
       throw new CustomError({ message: 'Unauthorized', statusCode: 401 });
     }
 
-    const fromVa = dto?.payment_id;
-    const fromEWallet = dto?.event === 'ewallet.capture';
-    const fromQrCode = dto?.event === 'qr.payment';
-    const fromPaylater = dto?.event === 'paylater.payment';
-    const fromRetailOutlet =
-      dto?.data?.channel_code === 'ALFAMART' ||
-      dto?.data?.channel_code === 'INDOMARET';
+    const getOrderByPaymentMethod = async (): Promise<ISelectGeneralOrder> => {
+      const isVa = dto?.payment_id;
+      const isEWallet = dto?.event === 'ewallet.capture';
+      const isQrCode = dto?.event === 'qr.payment';
+      const isPaylater = dto?.event === 'paylater.payment';
+      const isRetailOutlet =
+        dto?.data?.channel_code === 'ALFAMART' ||
+        dto?.data?.channel_code === 'INDOMARET';
 
-    let order: ISelectGeneralOrder;
+      let orderCallback;
+      const referenceId = dto.data?.reference_id;
+      const externalId = dto.external_id;
 
-    if (fromVa) {
-      const orderCallback =
-        await this.orderCallbackPaymentRepository.getThrowByExternalId({
-          externalId: dto.external_id,
+      if (isVa) {
+        orderCallback =
+          await this.orderCallbackPaymentRepository.getThrowByExternalId({
+            externalId,
+          });
+      } else if (isEWallet) {
+        orderCallback =
+          await this.orderCallbackPaymentRepository.getThrowByReferenceId({
+            referenceId,
+          });
+      } else if (isQrCode) {
+        orderCallback =
+          await this.orderCallbackPaymentRepository.getThrowByQrReferenceId({
+            qrReferenceId: referenceId,
+          });
+      } else if (isPaylater) {
+        orderCallback =
+          await this.orderCallbackPaymentRepository.getThrowByPaylaterReferenceId(
+            {
+              paylaterReferenceId: referenceId,
+            },
+          );
+      } else if (isRetailOutlet) {
+        orderCallback =
+          await this.orderCallbackPaymentRepository.getThrowByRetailOutletReferenceId(
+            {
+              retailOutletReferenceId: referenceId,
+            },
+          );
+      }
+
+      if (!orderCallback) {
+        throw new CustomError({
+          message: 'Order callback not found',
+          statusCode: 404,
         });
-      order = await this.orderRepository.getThrowById({
-        id: orderCallback.orderId,
-        select: selectGeneralOrder,
-      });
-    }
+      }
 
-    if (fromEWallet) {
-      const orderCallback =
-        await this.orderCallbackPaymentRepository.getThrowByReferenceId({
-          referenceId: dto.data.reference_id,
-        });
-      order = await this.orderRepository.getThrowById({
+      return await this.orderRepository.getThrowById({
         id: orderCallback.orderId,
         select: selectGeneralOrder,
       });
-    }
+    };
 
-    if (fromQrCode) {
-      const orderCallback =
-        await this.orderCallbackPaymentRepository.getThrowByQrReferenceId({
-          qrReferenceId: dto.data.reference_id,
-        });
-      order = await this.orderRepository.getThrowById({
-        id: orderCallback.orderId,
-        select: selectGeneralOrder,
-      });
-    }
-
-    if (fromPaylater) {
-      const orderCallback =
-        await this.orderCallbackPaymentRepository.getThrowByPaylaterReferenceId(
-          {
-            paylaterReferenceId: dto.data.reference_id,
-          },
-        );
-      order = await this.orderRepository.getThrowById({
-        id: orderCallback.orderId,
-        select: selectGeneralOrder,
-      });
-    }
-
-    if (fromRetailOutlet) {
-      const orderCallback =
-        await this.orderCallbackPaymentRepository.getThrowByRetailOutletReferenceId(
-          {
-            retailOutletReferenceId: dto.data.reference_id,
-          },
-        );
-      order = await this.orderRepository.getThrowById({
-        id: orderCallback.orderId,
-        select: selectGeneralOrder,
-      });
-    }
+    const order = await getOrderByPaymentMethod();
 
     if (
       order?.expiredAt < new Date() &&
       order.status === TypeStatusOrder.WAITING_PAYMENT
     ) {
-      await this.orderRepository.update({
-        where: { id: order.id },
-        data: {
-          status: TypeStatusOrder.CANCELLED,
-          expiredAt: null,
-        },
-      });
-      await this.restoreOrderStock(order.id);
+      await Promise.all([
+        this.orderRepository.update({
+          where: { id: order.id },
+          data: {
+            status: TypeStatusOrder.CANCELLED,
+            expiredAt: null,
+          },
+        }),
+        this.restoreOrderStock(order.id),
+      ]);
 
       throw new CustomError({
         message: 'Order Expired',
@@ -877,7 +869,7 @@ export class OrderService {
       });
     }
 
-    await this.orderRepository.update({
+    const updateOrderPromise = this.orderRepository.update({
       where: { id: order.id },
       data: {
         status: TypeStatusOrder.ON_PROGRESS,
@@ -885,57 +877,66 @@ export class OrderService {
       },
     });
 
+    let customerVoucherPromise = Promise.resolve();
     if (order.customerId) {
-      const customer = await this.customerRepository.getThrowById({
-        id: order.customerId,
-      });
-
-      if (order.voucherId) {
-        await this.customerVoucher.upsert({
-          where: {
-            customerId_voucherId: {
-              customerId: customer.id,
-              voucherId: order.voucherId,
-            },
-          },
-          update: {
-            usageCount: { increment: 1 },
-          },
-          create: {
-            customer: { connect: { id: customer.id } },
-            voucher: { connect: { id: order.voucherId } },
-            usageCount: 1,
-          },
+      customerVoucherPromise = (async () => {
+        const customer = await this.customerRepository.getThrowById({
+          id: order.customerId,
         });
-      }
+
+        if (order.voucherId) {
+          await this.customerVoucher.upsert({
+            where: {
+              customerId_voucherId: {
+                customerId: customer.id,
+                voucherId: order.voucherId,
+              },
+            },
+            update: {
+              usageCount: { increment: 1 },
+            },
+            create: {
+              customer: { connect: { id: customer.id } },
+              voucher: { connect: { id: order.voucherId } },
+              usageCount: 1,
+            },
+          });
+        }
+      })();
     }
 
-    await this.mailService.sendInvoice({
-      subject: '[G-Solusi] Receipt - Your Order',
-      title: 'Check Tracking',
-      description:
-        'Want real-time updates on your order? 📦 Click "Check Tracking", enter your Order ID, and stay informed every step of the way! 🚀',
-      buttonText: 'Check Tracking',
-      link: `${process.env.FRONTEND_URL}/track-order?trackingId=${order.trackId}`,
-      email: order.email,
-      order: {
-        id: order.trackId,
-        name: order.name,
-        phone: order.phoneNumber,
+    await Promise.all([updateOrderPromise, customerVoucherPromise]);
+
+    this.mailService
+      .sendInvoice({
+        subject: '[G-Solusi] Receipt - Your Order',
+        title: 'Check Tracking',
+        description:
+          'Want real-time updates on your order? 📦 Click "Check Tracking", enter your Order ID, and stay informed every step of the way! 🚀',
+        buttonText: 'Check Tracking',
+        link: `${process.env.FRONTEND_URL}/track-order?trackingId=${order.trackId}`,
         email: order.email,
-        address: order?.recipientAddress?.address ?? 'Pickup Store',
-        createdAt: order.createdAt,
-        orderProducts: order.orderProduct,
-        subtotal: order.subTotalPay.toString(),
-        totalDiscount: order.voucherDiscount.toString(),
-        deliveryFee: order.deliveryFee.toString(),
-        total: order.totalPayment.toString(),
-        status: this.orderRepository.formatOrderStatus(
-          TypeStatusOrder.ON_PROGRESS,
-        ),
-        statusColor: '#4673fa',
-      },
-    });
+        order: {
+          id: order.trackId,
+          name: order.name,
+          phone: order.phoneNumber,
+          email: order.email,
+          address: order?.recipientAddress?.address ?? 'Pickup Store',
+          createdAt: order.createdAt,
+          orderProducts: order.orderProduct,
+          subtotal: order.subTotalPay.toString(),
+          totalDiscount: order.voucherDiscount.toString(),
+          deliveryFee: order.deliveryFee.toString(),
+          total: order.totalPayment.toString(),
+          status: this.orderRepository.formatOrderStatus(
+            TypeStatusOrder.ON_PROGRESS,
+          ),
+          statusColor: '#4673fa',
+        },
+      })
+      .catch((err) => {
+        console.error('Failed to send invoice email:', err);
+      });
 
     return { status: 'success' };
   }
@@ -1696,6 +1697,13 @@ export class OrderService {
 
     const numberOfTransaction = await this.orderRepository.count({
       where: {
+        status: {
+          in: [
+            TypeStatusOrder.ON_PROGRESS,
+            TypeStatusOrder.DELIVERED,
+            TypeStatusOrder.SHIPPED,
+          ],
+        },
         ...(filter.startDate &&
           filter.endDate && {
             createdAt: {
