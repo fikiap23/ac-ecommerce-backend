@@ -789,87 +789,63 @@ export class OrderService {
       throw new CustomError({ message: 'Unauthorized', statusCode: 401 });
     }
 
-    const getOrderByPaymentMethod = async (): Promise<ISelectGeneralOrder> => {
-      const isVa = dto?.payment_id;
-      const isEWallet = dto?.event === 'ewallet.capture';
-      const isQrCode = dto?.event === 'qr.payment';
-      const isPaylater = dto?.event === 'paylater.payment';
-      const isRetailOutlet =
-        dto?.data?.channel_code === 'ALFAMART' ||
-        dto?.data?.channel_code === 'INDOMARET';
+    const isVa = dto?.payment_id;
+    const isEWallet = dto?.event === 'ewallet.capture';
+    const isQrCode = dto?.event === 'qr.payment';
+    const isPaylater = dto?.event === 'paylater.payment';
+    const isRetailOutlet =
+      dto?.data?.channel_code === 'ALFAMART' ||
+      dto?.data?.channel_code === 'INDOMARET';
 
-      let orderCallback;
-      const referenceId = dto.data?.reference_id;
-      const externalId = dto.external_id;
+    const referenceId = dto.data?.reference_id;
+    const externalId = dto.external_id;
 
-      if (isVa) {
-        orderCallback =
-          await this.orderCallbackPaymentRepository.getThrowByExternalId({
-            externalId,
-          });
-      } else if (isEWallet) {
-        orderCallback =
-          await this.orderCallbackPaymentRepository.getThrowByReferenceId({
-            referenceId,
-          });
-      } else if (isQrCode) {
-        orderCallback =
-          await this.orderCallbackPaymentRepository.getThrowByQrReferenceId({
-            qrReferenceId: referenceId,
-          });
-      } else if (isPaylater) {
-        orderCallback =
-          await this.orderCallbackPaymentRepository.getThrowByPaylaterReferenceId(
-            {
-              paylaterReferenceId: referenceId,
-            },
-          );
-      } else if (isRetailOutlet) {
-        orderCallback =
-          await this.orderCallbackPaymentRepository.getThrowByRetailOutletReferenceId(
-            {
-              retailOutletReferenceId: referenceId,
-            },
-          );
-      }
+    let orderCallback;
 
-      if (!orderCallback) {
-        throw new CustomError({
-          message: 'Order callback not found',
-          statusCode: 404,
+    if (isVa) {
+      orderCallback =
+        await this.orderCallbackPaymentRepository.getThrowByExternalId({
+          externalId,
         });
-      }
-
-      return await this.orderRepository.getThrowById({
-        id: orderCallback.orderId,
-        select: selectGeneralOrder,
-      });
-    };
-
-    const order = await getOrderByPaymentMethod();
-
-    if (
-      order?.expiredAt < new Date() &&
-      order.status === TypeStatusOrder.WAITING_PAYMENT
-    ) {
-      await Promise.all([
-        this.orderRepository.update({
-          where: { id: order.id },
-          data: {
-            status: TypeStatusOrder.CANCELLED,
-            expiredAt: null,
+    } else if (isEWallet) {
+      orderCallback =
+        await this.orderCallbackPaymentRepository.getThrowByReferenceId({
+          referenceId,
+        });
+    } else if (isQrCode) {
+      orderCallback =
+        await this.orderCallbackPaymentRepository.getThrowByQrReferenceId({
+          qrReferenceId: referenceId,
+        });
+    } else if (isPaylater) {
+      orderCallback =
+        await this.orderCallbackPaymentRepository.getThrowByPaylaterReferenceId(
+          {
+            paylaterReferenceId: referenceId,
           },
-        }),
-        this.restoreOrderStock(order.id),
-      ]);
+        );
+    } else if (isRetailOutlet) {
+      orderCallback =
+        await this.orderCallbackPaymentRepository.getThrowByRetailOutletReferenceId(
+          {
+            retailOutletReferenceId: referenceId,
+          },
+        );
+    }
 
+    if (!orderCallback) {
       throw new CustomError({
-        message: 'Order Expired',
-        statusCode: 400,
+        message: 'Order callback not found',
+        statusCode: 404,
       });
     }
 
-    const updateOrderPromise = this.orderRepository.update({
+    const order = await this.orderRepository.getThrowById({
+      id: orderCallback.orderId,
+      select: selectGeneralOrder,
+    });
+
+    await this.orderRepository.update({
       where: { id: order.id },
       data: {
         status: TypeStatusOrder.ON_PROGRESS,
@@ -877,66 +853,38 @@ export class OrderService {
       },
     });
 
-    let customerVoucherPromise = Promise.resolve();
-    if (order.customerId) {
-      customerVoucherPromise = (async () => {
-        const customer = await this.customerRepository.getThrowById({
-          id: order.customerId,
-        });
-
-        if (order.voucherId) {
-          await this.customerVoucher.upsert({
-            where: {
-              customerId_voucherId: {
-                customerId: customer.id,
-                voucherId: order.voucherId,
-              },
-            },
-            update: {
-              usageCount: { increment: 1 },
-            },
-            create: {
-              customer: { connect: { id: customer.id } },
-              voucher: { connect: { id: order.voucherId } },
-              usageCount: 1,
-            },
-          });
-        }
-      })();
-    }
-
-    await Promise.all([updateOrderPromise, customerVoucherPromise]);
-
-    this.mailService
-      .sendInvoice({
-        subject: '[G-Solusi] Receipt - Your Order',
-        title: 'Check Tracking',
-        description:
-          'Want real-time updates on your order? 📦 Click "Check Tracking", enter your Order ID, and stay informed every step of the way! 🚀',
-        buttonText: 'Check Tracking',
-        link: `${process.env.FRONTEND_URL}/track-order?trackingId=${order.trackId}`,
-        email: order.email,
-        order: {
-          id: order.trackId,
-          name: order.name,
-          phone: order.phoneNumber,
+    setImmediate(() => {
+      this.mailService
+        .sendInvoice({
+          subject: '[G-Solusi] Receipt - Your Order',
+          title: 'Check Tracking',
+          description:
+            'Want real-time updates on your order? 📦 Click "Check Tracking", enter your Order ID, and stay informed every step of the way! 🚀',
+          buttonText: 'Check Tracking',
+          link: `${process.env.FRONTEND_URL}/track-order?trackingId=${order.trackId}`,
           email: order.email,
-          address: order?.recipientAddress?.address ?? 'Pickup Store',
-          createdAt: order.createdAt,
-          orderProducts: order.orderProduct,
-          subtotal: order.subTotalPay.toString(),
-          totalDiscount: order.voucherDiscount.toString(),
-          deliveryFee: order.deliveryFee.toString(),
-          total: order.totalPayment.toString(),
-          status: this.orderRepository.formatOrderStatus(
-            TypeStatusOrder.ON_PROGRESS,
-          ),
-          statusColor: '#4673fa',
-        },
-      })
-      .catch((err) => {
-        console.error('Failed to send invoice email:', err);
-      });
+          order: {
+            id: order.trackId,
+            name: order.name,
+            phone: order.phoneNumber,
+            email: order.email,
+            address: order?.recipientAddress?.address ?? 'Pickup Store',
+            createdAt: order.createdAt,
+            orderProducts: order.orderProduct,
+            subtotal: order.subTotalPay.toString(),
+            totalDiscount: order.voucherDiscount.toString(),
+            deliveryFee: order.deliveryFee.toString(),
+            total: order.totalPayment.toString(),
+            status: this.orderRepository.formatOrderStatus(
+              TypeStatusOrder.ON_PROGRESS,
+            ),
+            statusColor: '#4673fa',
+          },
+        })
+        .catch((err) => {
+          console.error('Failed to send invoice email:', err);
+        });
+    });
 
     return { status: 'success' };
   }
