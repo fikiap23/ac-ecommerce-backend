@@ -1178,6 +1178,9 @@ export class OrderService {
         // ambil semua pemakaian device di order lain (SERVICE atau PRODUCT)
         const usedDevices = await this.orderProductRepository.getManyDevice({
           where: {
+            order: {
+              status: { not: TypeStatusOrder.CANCELLED },
+            },
             deviceId: { in: deviceIds },
             orderId: { not: order.id },
           },
