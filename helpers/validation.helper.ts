@@ -8,7 +8,22 @@ export const isEmpty = (value: any) => {
 };
 
 export const imageFileFilter = (req, file, callback) => {
-  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
+  const allowedExtensions = [
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.webp',
+    '.gif',
+    '.bmp',
+    '.tiff',
+    '.tif',
+    '.heic',
+    '.heif',
+    '.svg',
+    '.avif',
+    '.jfif',
+  ];
+
   const ext = path.extname(file.originalname).toLowerCase();
   let validExt = false;
 
