@@ -75,7 +75,10 @@ export class OrderRepository {
           });
         }
 
-        const priceToUse = variant.salePrice ?? variant.regularPrice;
+        const priceToUse =
+          variant.salePrice && variant.salePrice > 0
+            ? variant.salePrice
+            : variant.regularPrice;
 
         if (priceToUse == null || Number.isNaN(Number(priceToUse))) {
           throw new CustomError({
