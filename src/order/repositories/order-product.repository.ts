@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, TypeProductService } from '@prisma/client';
+import { Prisma, TypeProductService, TypeStatusOrder } from '@prisma/client';
 import { OrderProductQuery } from 'src/prisma/queries/order/order-product.query';
 import { IDeviceListFilter } from '../interfaces/order.interface';
 
@@ -47,6 +47,7 @@ export class OrderProductRepository {
       orderUuid,
       orderId,
       sort = 'desc',
+      customerId,
     } = filter;
 
     const where: Prisma.OrderProductWhereInput = {
@@ -55,11 +56,19 @@ export class OrderProductRepository {
         orderUuid ? { order: { uuid: orderUuid } } : undefined,
         orderId ? { orderId } : undefined,
         { deviceId: { not: null } },
-        { order: { customerId: filter.customerId } },
+        {
+          order: {
+            customerId,
+            status: { not: TypeStatusOrder.CANCELLED },
+          },
+        },
         {
           OR: [
             { serviceType: TypeProductService.PRODUCT },
-            { serviceType: TypeProductService.SERVICE, isDeviceOutside: true },
+            {
+              serviceType: TypeProductService.SERVICE,
+              isDeviceOutside: true,
+            },
           ],
         },
         search
@@ -74,13 +83,34 @@ export class OrderProductRepository {
       ].filter(Boolean) as Prisma.OrderProductWhereInput[],
     };
 
-    return this.orderProductQuery.findDeviceManyPaginate({
+    const rows = await this.orderProductQuery.findMany({
       tx,
       where,
       orderBy: { createdAt: sort },
-      page,
-      limit,
     });
+
+    const uniqueRows = this.filterUniqueDevice(rows);
+
+    const total = uniqueRows.length;
+    const lastPage = Math.ceil(total / limit);
+
+    const currentPage = Math.max(1, page);
+    const start = (currentPage - 1) * limit;
+    const end = start + limit;
+
+    const data = uniqueRows.slice(start, end);
+
+    return {
+      data,
+      meta: {
+        total,
+        lastPage,
+        currentPage,
+        perPage: limit,
+        prev: currentPage > 1 ? currentPage - 1 : null,
+        next: currentPage < lastPage ? currentPage + 1 : null,
+      },
+    };
   }
 
   async getManyDevice({
@@ -93,5 +123,32 @@ export class OrderProductRepository {
     select?: Prisma.OrderProductSelect;
   }) {
     return await this.orderProductQuery.findDeviceMany({ tx, where, select });
+  }
+
+  private filterUniqueDevice(
+    rows: Array<{
+      deviceId: string | null;
+      isDeviceOutside: boolean;
+    }>,
+  ) {
+    const map = new Map<string, (typeof rows)[number]>();
+
+    for (const row of rows) {
+      if (!row.deviceId) continue;
+
+      const existing = map.get(row.deviceId);
+
+      if (!existing) {
+        map.set(row.deviceId, row);
+        continue;
+      }
+
+      // prioritaskan isDeviceOutside = true
+      if (!existing.isDeviceOutside && row.isDeviceOutside) {
+        map.set(row.deviceId, row);
+      }
+    }
+
+    return Array.from(map.values());
   }
 }

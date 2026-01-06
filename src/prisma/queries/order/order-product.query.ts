@@ -12,13 +12,15 @@ export class OrderProductQuery extends PrismaService {
     tx,
     where,
     select,
+    orderBy,
   }: {
     tx?: Prisma.TransactionClient;
     where?: Prisma.OrderProductWhereInput;
     select?: Prisma.OrderProductSelect;
+    orderBy?: Prisma.OrderProductOrderByWithRelationInput;
   }) {
     const prisma = tx ?? this;
-    return await prisma.orderProduct.findMany({ where, select });
+    return await prisma.orderProduct.findMany({ where, select, orderBy });
   }
 
   async updateByUuid({
