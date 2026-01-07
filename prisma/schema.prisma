@@ -729,3 +729,53 @@ model Gallery {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model District {
+  id          Int       @id @default(autoincrement())
+  uuid        String    @unique @default(uuid())
+  code        String    @unique @db.VarChar(8)
+  name        String    @db.VarChar(255)
+  regencyCode String    @db.VarChar(5)
+  regency     Regency   @relation(fields: [regencyCode], references: [code])
+  villages    Village[]
+}
+
+model Island {
+  id               Int      @id @default(autoincrement())
+  uuid             String   @unique @default(uuid())
+  code             String   @unique @db.VarChar(11)
+  coordinate       String   @db.VarChar(30)
+  isOutermostSmall Boolean
+  isPopulated      Boolean
+  name             String   @db.VarChar(255)
+  regencyCode      String?  @db.VarChar(5)
+  regency          Regency? @relation(fields: [regencyCode], references: [code])
+}
+
+model Province {
+  id        Int       @id @default(autoincrement())
+  uuid      String    @unique @default(uuid())
+  code      String    @unique @db.VarChar(2)
+  name      String    @db.VarChar(255)
+  regencies Regency[]
+}
+
+model Regency {
+  id           Int        @id @default(autoincrement())
+  uuid         String     @unique @default(uuid())
+  code         String     @unique @db.VarChar(5)
+  name         String     @db.VarChar(255)
+  provinceCode String     @db.VarChar(2)
+  islands      Island[]
+  districts    District[]
+  province     Province   @relation(fields: [provinceCode], references: [code])
+}
+
+model Village {
+  id           Int      @id @default(autoincrement())
+  uuid         String   @unique @default(uuid())
+  code         String   @db.VarChar(13)
+  districtCode String   @db.VarChar(8)
+  name         String   @db.VarChar(255)
+  district     District @relation(fields: [districtCode], references: [code])
+}
