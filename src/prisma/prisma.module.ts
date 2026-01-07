@@ -27,6 +27,11 @@ import { SiteSettingQuery } from './queries/setting/site-setting.query';
 import { SettingSocialQuery } from './queries/setting/setting-social.query';
 import { MessageQuery } from './queries/message/message.query';
 import { GalleryQuery } from './queries/gallery/gallery.query';
+import { ProvinceQuery } from './queries/region/province.query';
+import { RegencyQuery } from './queries/region/regency.query';
+import { DistrictQuery } from './queries/region/district.query';
+import { VillageQuery } from './queries/region/village.query';
+import { IslandQuery } from './queries/region/island.query';
 
 @Module({
   imports: [],
@@ -59,6 +64,11 @@ import { GalleryQuery } from './queries/gallery/gallery.query';
     SettingSocialQuery,
     MessageQuery,
     GalleryQuery,
+    ProvinceQuery,
+    RegencyQuery,
+    DistrictQuery,
+    VillageQuery,
+    IslandQuery,
   ],
   exports: [
     PrismaService,
@@ -89,6 +99,11 @@ import { GalleryQuery } from './queries/gallery/gallery.query';
     SettingSocialQuery,
     MessageQuery,
     GalleryQuery,
+    ProvinceQuery,
+    RegencyQuery,
+    DistrictQuery,
+    VillageQuery,
+    IslandQuery,
   ],
 })
 export class PrismaModule {}

@@ -18,6 +18,7 @@ import { TechnicianModule } from './technician/technician.module';
 import { SettingModule } from './setting/setting.module';
 import { MessageModule } from './message/message.module';
 import { GalleryModule } from './gallery/gallery.module';
+import { MasterDataModule } from './master-data/master-data.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { GalleryModule } from './gallery/gallery.module';
     SettingModule,
     MessageModule,
     GalleryModule,
+    MasterDataModule,
   ],
 })
 export class AppModule implements NestModule {
