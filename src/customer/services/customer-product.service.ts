@@ -17,7 +17,7 @@ import {
 } from 'src/prisma/queries/customer/props/select-customer-product.prop';
 import { ProductVariantRepository } from 'src/product/repositories/product-variant.repository';
 import { ISelectGeneralBundle } from '../interfaces/customer-product.interface';
-import { Prisma, ProductVariant } from '@prisma/client';
+import { Prisma, ProductVariant, TypeProductService } from '@prisma/client';
 
 @Injectable()
 export class CustomerProductService {
@@ -66,19 +66,28 @@ export class CustomerProductService {
           });
         }
 
-        // const dup = await this.customerProductRepository.getMany({
-        //   where: {
-        //     customerId: customer.id,
-        //     productId: entity.id,
-        //     productVariantId: productVariant.id,
-        //   },
-        // });
-        // if (dup.length) {
-        //   throw new CustomError({
-        //     message: 'Produk sudah ada di keranjang',
-        //     statusCode: 400,
-        //   });
-        // }
+        if (entity) {
+          const dup = await this.customerProductRepository.getMany({
+            where: {
+              customerId: customer.id,
+              productId: entity.id,
+              productVariantId: productVariant.id,
+            },
+          });
+
+          if (dup?.length > 0) {
+            const product = await this.productRepository.getThrowByUuid({
+              uuid: dto.productUuid,
+            });
+
+            if (product.serviceType === TypeProductService.PRODUCT) {
+              throw new CustomError({
+                message: 'Produk sudah ada di keranjang',
+                statusCode: 400,
+              });
+            }
+          }
+        }
       }
 
       return await this.customerProductRepository.create({
