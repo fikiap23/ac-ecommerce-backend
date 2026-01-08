@@ -66,19 +66,19 @@ export class CustomerProductService {
           });
         }
 
-        const dup = await this.customerProductRepository.getMany({
-          where: {
-            customerId: customer.id,
-            productId: entity.id,
-            productVariantId: productVariant.id,
-          },
-        });
-        if (dup.length) {
-          throw new CustomError({
-            message: 'Produk sudah ada di keranjang',
-            statusCode: 400,
-          });
-        }
+        // const dup = await this.customerProductRepository.getMany({
+        //   where: {
+        //     customerId: customer.id,
+        //     productId: entity.id,
+        //     productVariantId: productVariant.id,
+        //   },
+        // });
+        // if (dup.length) {
+        //   throw new CustomError({
+        //     message: 'Produk sudah ada di keranjang',
+        //     statusCode: 400,
+        //   });
+        // }
       }
 
       return await this.customerProductRepository.create({
