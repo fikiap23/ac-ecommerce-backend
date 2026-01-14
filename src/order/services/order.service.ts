@@ -445,7 +445,7 @@ export class OrderService {
           }),
 
           orderProduct: {
-            create: carts.map((ci) => {
+            create: carts.flatMap((ci) => {
               const p = productByUuid.get(ci.productUuid);
               if (!p) {
                 throw new CustomError({
@@ -454,7 +454,6 @@ export class OrderService {
                 });
               }
 
-              // Cek apakah ada variant (baik PRODUCT maupun SERVICE)
               const variant = ci.productVariantUuid
                 ? pickVariant(p, ci.productVariantUuid)
                 : undefined;
@@ -484,7 +483,8 @@ export class OrderService {
               const capacityName = variant?.capacity?.name ?? p.capacity?.name;
               const categoryName = p.categoryProduct?.name ?? null;
 
-              return {
+              // FlatMap untuk membuat qty record masing-masing 1
+              return Array.from({ length: ci.quantity }, () => ({
                 deviceId: ci.deviceId ?? null,
                 name: p.name ?? '',
                 brand: p.brand ?? null,
@@ -502,9 +502,9 @@ export class OrderService {
                 orderProductVariantId: variant?.id ?? undefined,
                 orderProductUuid: ci.productUuid,
                 orderProductVariantUuid: ci.productVariantUuid ?? undefined,
-                quantity: ci.quantity,
-                discount: 0,
+                quantity: 1, // selalu 1
 
+                discount: 0,
                 createdAt: new Date(),
                 updatedAt: new Date(),
 
@@ -529,7 +529,7 @@ export class OrderService {
                     updatedAt: new Date(),
                   })),
                 },
-              };
+              }));
             }),
           },
 
